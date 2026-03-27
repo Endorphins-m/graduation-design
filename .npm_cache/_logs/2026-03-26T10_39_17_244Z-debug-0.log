@@ -1,0 +1,76 @@
+0 verbose cli E:\node.js\node.js2\node.exe E:\node.js\node.js2\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.8.2
+2 info using node@v20.18.0
+3 silly config load:file:E:\node.js\node.js2\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\20173\AppData\Local\Microsoft\TypeScript\5.2\.npmrc
+5 silly config load:file:C:\Users\20173\.npmrc
+6 silly config load:file:E:\node.js\node.js2\node_global\etc\npmrc
+7 verbose title npm install @types/react@ts5.2
+8 verbose argv "install" "--ignore-scripts" "@types/react@ts5.2" "--save-dev" "--user-agent" "typesInstaller/5.2.2"
+9 verbose logfile logs-max:10 dir:C:\Users\20173\Desktop\graduation design\person\.npm_cache\_logs\2026-03-26T10_39_17_244Z-
+10 verbose logfile C:\Users\20173\Desktop\graduation design\person\.npm_cache\_logs\2026-03-26T10_39_17_244Z-debug-0.log
+11 silly packumentCache heap:2197815296 maxSize:549453824 maxEntrySize:274726912
+12 silly logfile done cleaning log files
+13 silly packumentCache corgi:https://registry.npmmirror.com/@types%2freact cache-miss
+14 http fetch GET 200 https://registry.npmmirror.com/@types%2freact 306ms (cache miss)
+15 silly packumentCache corgi:https://registry.npmmirror.com/@types%2freact set size:175883 disposed:false
+16 silly idealTree buildDeps
+17 silly fetch manifest @types/react@19.2.14
+18 silly packumentCache full:https://registry.npmmirror.com/@types%2freact cache-miss
+19 http fetch GET 200 https://registry.npmmirror.com/@types%2freact 124ms (cache miss)
+20 silly packumentCache full:https://registry.npmmirror.com/@types%2freact set size:331315 disposed:false
+21 silly placeDep ROOT @types/react@19.2.14 OK for:  want: 19.2.14
+22 silly fetch manifest csstype@^3.2.2
+23 silly packumentCache full:https://registry.npmmirror.com/csstype cache-miss
+24 http fetch GET 200 https://registry.npmmirror.com/csstype 101ms (cache miss)
+25 silly packumentCache full:https://registry.npmmirror.com/csstype set size:41498 disposed:false
+26 silly placeDep ROOT csstype@3.2.3 OK for: @types/react@19.2.14 want: ^3.2.2
+27 silly reify moves {}
+28 silly audit bulk request {
+28 silly audit   'types-registry': [ '0.1.762' ],
+28 silly audit   '@types/react': [ '19.2.14' ],
+28 silly audit   csstype: [ '3.2.3' ]
+28 silly audit }
+29 silly tarball no local data for @types/react@https://registry.npmmirror.com/@types/react/-/react-19.2.14.tgz. Extracting by manifest.
+30 silly tarball no local data for csstype@https://registry.npmmirror.com/csstype/-/csstype-3.2.3.tgz. Extracting by manifest.
+31 http fetch POST 404 https://registry.npmmirror.com/-/npm/v1/security/advisories/bulk 41ms
+32 silly audit bulk request failed [object Object]
+33 http fetch POST 404 https://registry.npmmirror.com/-/npm/v1/security/audits/quick 35ms
+34 verbose audit error HttpErrorGeneral: 404 Not Found - POST https://registry.npmmirror.com/-/npm/v1/security/audits/quick - [NOT_IMPLEMENTED] /-/npm/v1/security/* not implemented yet
+34 verbose audit error     at E:\node.js\node.js2\node_modules\npm\node_modules\npm-registry-fetch\lib\check-response.js:95:15
+34 verbose audit error     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+34 verbose audit error     at async [getReport] (E:\node.js\node.js2\node_modules\npm\node_modules\@npmcli\arborist\lib\audit-report.js:336:21)
+34 verbose audit error     at async AuditReport.run (E:\node.js\node.js2\node_modules\npm\node_modules\@npmcli\arborist\lib\audit-report.js:106:19) {
+34 verbose audit error   headers: [Object: null prototype] {
+34 verbose audit error     server: [ 'Tengine' ],
+34 verbose audit error     date: [ 'Thu, 26 Mar 2026 10:39:18 GMT' ],
+34 verbose audit error     'content-type': [ 'application/json' ],
+34 verbose audit error     'transfer-encoding': [ 'chunked' ],
+34 verbose audit error     connection: [ 'keep-alive' ],
+34 verbose audit error     'strict-transport-security': [ 'max-age=5184000' ],
+34 verbose audit error     via: [ 'kunlun5.cn7892[,404666]' ],
+34 verbose audit error     'timing-allow-origin': [ '*' ],
+34 verbose audit error     eagleid: [ 'b7f0ed1917745215588167806e' ],
+34 verbose audit error     'x-fetch-attempts': [ '1' ]
+34 verbose audit error   },
+34 verbose audit error   statusCode: 404,
+34 verbose audit error   code: 'E404',
+34 verbose audit error   method: 'POST',
+34 verbose audit error   uri: 'https://registry.npmmirror.com/-/npm/v1/security/audits/quick',
+34 verbose audit error   body: {
+34 verbose audit error     error: '[NOT_IMPLEMENTED] /-/npm/v1/security/* not implemented yet'
+34 verbose audit error   },
+34 verbose audit error   pkgid: undefined
+34 verbose audit error }
+35 silly audit error [object Object]
+36 silly audit report null
+37 http fetch GET 200 https://cdn.npmmirror.com/packages/csstype/3.2.3/csstype-3.2.3.tgz 217ms (cache miss)
+38 http fetch GET 200 https://cdn.npmmirror.com/packages/%40types/react/19.2.14/react-19.2.14.tgz 235ms (cache miss)
+39 silly ADD node_modules/csstype
+40 silly ADD node_modules/@types/react
+41 verbose cwd C:\Users\20173\AppData\Local\Microsoft\TypeScript\5.2
+42 verbose os Windows_NT 10.0.22631
+43 verbose node v20.18.0
+44 verbose npm  v10.8.2
+45 verbose exit 0
+46 info ok

@@ -1,0 +1,75 @@
+{
+  "bsonType": "object",
+  "required": ["phone"],
+  "permission": {
+    "read": "doc._id == auth.uid",
+    "create": true,
+    "update": "doc._id == auth.uid",
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "ID"
+    },
+    "phone": {
+      "bsonType": "string",
+      "description": "手机号"
+    },
+    "password": {
+      "bsonType": "string",
+      "description": "密码"
+    },
+    "username": {
+      "bsonType": "string",
+      "description": "用户名"
+    },
+    "avatar": {
+      "bsonType": "string",
+      "description": "头像"
+    },
+    "level": {
+      "bsonType": "int",
+      "description": "等级"
+    },
+    "title": {
+      "bsonType": "string",
+      "description": "称号"
+    },
+    "streak": {
+      "bsonType": "int",
+      "description": "连续打卡"
+    },
+    "totalQuestions": {
+      "bsonType": "int",
+      "description": "总刷题数"
+    },
+    "accuracy": {
+      "bsonType": "int",
+      "description": "正确率"
+    },
+    "studyHours": {
+      "bsonType": "double",
+      "description": "学习时长"
+    },
+    "profile": {
+      "bsonType": "object",
+      "description": "能力画像"
+    },
+    "learningPrefs": {
+      "bsonType": "object",
+      "description": "学习偏好"
+    },
+    "lastLogin": {
+      "bsonType": "timestamp",
+      "description": "最后登录时间"
+    },
+    "createdAt": {
+      "bsonType": "timestamp",
+      "description": "创建时间"
+    },
+    "status": {
+      "bsonType": "string",
+      "description": "状态"
+    }
+  }
+}

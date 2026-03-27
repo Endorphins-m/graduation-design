@@ -1,0 +1,29 @@
+{
+  "bsonType": "object",
+  "permission": {
+    "read": false,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "phone": {
+      "bsonType": "string"
+    },
+    "code": {
+      "bsonType": "string"
+    },
+    "type": {
+      "bsonType": "string"
+    },
+    "used": {
+      "bsonType": "bool"
+    },
+    "createdAt": {
+      "bsonType": "timestamp"
+    },
+    "expireAt": {
+      "bsonType": "timestamp"
+    }
+  }
+}

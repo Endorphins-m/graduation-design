@@ -1,0 +1,32 @@
+{
+  "bsonType": "object",
+  "permission": {
+    "read": "doc.userId == auth.uid",
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "userId": {
+      "bsonType": "string"
+    },
+    "phone": {
+      "bsonType": "string"
+    },
+    "type": {
+      "bsonType": "string"
+    },
+    "ip": {
+      "bsonType": "string"
+    },
+    "device": {
+      "bsonType": "string"
+    },
+    "status": {
+      "bsonType": "string"
+    },
+    "createdAt": {
+      "bsonType": "timestamp"
+    }
+  }
+}
