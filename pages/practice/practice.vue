@@ -194,29 +194,66 @@ export default {
     }
   },
   
-  onLoad(options) {
-    // 接收从计划页传来的参数
-    const { type, focus, remaining } = options
-    this.loadRecommendedQuestions(type, focus, remaining)
-    this.startTime = Date.now()
-  },
+onLoad(options) {
+  // 1. 检查登录状态
+  const userId = uni.getStorageSync('userId');
+  if (!userId) {
+    uni.showModal({
+      title: '提示',
+      content: '请先登录以获取个性化题目',
+      success: (res) => {
+        if (res.confirm) {
+          uni.navigateTo({ url: '/pages/login/login' });
+        }
+      }
+    });
+    // 调试期可以先给一个默认存在的ID，确保能出题
+    // uni.setStorageSync('userId', '你的某个真实用户ID'); 
+  }
+
+  // 2. 接收参数并加载
+  const { type, focus, remaining } = options;
+  this.loadRecommendedQuestions(type, focus, remaining);
+},
   
   methods: {
     // 加载推荐题目 (调用云函数)
-    async loadRecommendedQuestions(type, focusType, limit) {
-      // uniCloud.callFunction({
-      //   name: 'getRecommendQuestions',
-      //   data: {
-      //     userId: uni.getStorageSync('userId'),
-      //     weakTypes: [focusType],
-      //     limit: parseInt(limit) || 50,
-      //     strategy: 'rule-based' // 初期使用规则推荐
-      //   }
-      // })
-      
-      // 模拟加载
-      this.dailyLimit = parseInt(limit) || 25
-    },
+async loadRecommendedQuestions(type, focusType, limit) {
+  uni.showLoading({ title: '加载中...' });
+  const userId = uni.getStorageSync('userId') || 'test-user-id';
+
+  try {
+    const res = await uniCloud.callFunction({
+      name: 'getRecommendQuestions',
+      data: {
+        userId: userId,
+        limit: parseInt(limit) || 10
+      }
+    });
+
+    // 重点：检查 res.result
+    if (res.result && res.result.code === 0) {
+      // 必须确保 data 是数组
+      if (Array.isArray(res.result.data) && res.result.data.length > 0) {
+        this.questionQueue = res.result.data;
+        this.recommendReason = res.result.recommendReason;
+        this.dailyLimit = this.questionQueue.length;
+        this.currentIndex = 0; // 确保从第一题开始
+        console.log('题目加载成功:', this.questionQueue);
+      } else {
+        uni.showToast({ title: '题库中没有符合条件的题目', icon: 'none' });
+      }
+    } else {
+      uni.showToast({ title: res.result.message || '加载失败', icon: 'none' });
+    }
+  } catch (e) {
+    console.error('请求异常:', e);
+    uni.showToast({ title: '服务器连接失败', icon: 'none' });
+  } finally {
+    uni.hideLoading();
+    this.startTime = Date.now();
+  }
+},
     
     selectOption(idx) {
       if (!this.showAnswer) {

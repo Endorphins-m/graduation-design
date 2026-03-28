@@ -1,0 +1,37 @@
+{
+  "bsonType": "object",
+  "required": ["content", "options", "correctAnswer", "type"],
+  "permission": {
+    "read": true,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": { "description": "题目ID" },
+    "content": { "bsonType": "string", "title": "题干内容" },
+    "options": {
+      "bsonType": "array",
+      "title": "选项",
+      "minItems": 4, "maxItems": 4,
+      "items": { "bsonType": "string" }
+    },
+    "correctAnswer": { "bsonType": "int", "title": "正确答案索引(0-3)" },
+    "type": {
+      "bsonType": "string",
+      "title": "题目类型",
+      "enum": [
+        { "text": "言语理解", "value": "verbal" },
+        { "text": "数量关系", "value": "quantitative" },
+        { "text": "判断推理", "value": "reasoning" },
+        { "text": "资料分析", "value": "dataAnalysis" },
+        { "text": "常识判断", "value": "commonSense" }
+      ]
+    },
+    "difficulty": { "bsonType": "int", "title": "难度系数(1-5)" },
+    "source": { "bsonType": "string", "title": "题目来源" },
+    "analysis": { "bsonType": "string", "title": "解析" },
+    "quickTip": { "bsonType": "string", "title": "速算技巧" },
+    "recommendTime": { "bsonType": "int", "title": "推荐用时(秒)" }
+  }
+}
