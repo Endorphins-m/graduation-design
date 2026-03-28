@@ -31,11 +31,18 @@
         "navigationBarBackgroundColor": "#ffffff"
       }
     },
+	{
+	  "path": "pages/library/library",
+	  "style": {
+		"navigationBarTitleText": "题库",
+		"enablePullDownRefresh": false
+	  }
+	},
     {
       "path": "pages/practice/practice",
       "style": {
-        "navigationBarTitleText": "刷题训练",
-        "navigationBarBackgroundColor": "#ffffff"
+        "navigationBarTitleText": "在线刷题",
+        "navigationStyle": "custom" 
       }
     },
     {
@@ -55,7 +62,7 @@
         "selectedIconPath": "static/tabbar/plan-active.png"
       },
       {
-        "pagePath": "pages/practice/practice",
+        "pagePath": "pages/library/library",
         "text": "刷题",
         "iconPath": "static/tabbar/practice.png",
         "selectedIconPath": "static/tabbar/practice-active.png"
