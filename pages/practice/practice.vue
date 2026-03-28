@@ -260,14 +260,45 @@ export default {
       }
     },
 
-    doSubmit() {
+    async doSubmit() {
       this.isSubmitted = true;
       this.totalTime = Math.floor((Date.now() - this.startTime) / 1000);
+      
+      // --- 新增：计算并同步进度 ---
+      const userId = uni.getStorageSync('userId');
+      if (userId) {
+        // 1. 统计本次练习各模块数量
+        const stats = {
+          totalCount: this.questionQueue.length,
+          modules: {}
+        };
+        
+        this.questionQueue.forEach(q => {
+          // 确保模块标识存在
+          const moduleKey = q.type || 'unknown';
+          if (!stats.modules[moduleKey]) stats.modules[moduleKey] = 0;
+          stats.modules[moduleKey]++;
+        });
+
+        // 2. 异步上传到云端（不阻塞用户看解析）
+        uniCloud.callFunction({
+          name: 'updateUserProgress',
+          data: {
+            userId: userId,
+            stats: stats
+          }
+        }).then(res => {
+          console.log('进度同步成功:', res);
+        }).catch(err => {
+          console.error('进度同步失败:', err);
+        });
+      }
+      // --- 同步逻辑结束 ---
+
       uni.showToast({ title: '交卷成功', icon: 'success' });
       this.currentIndex = 0;
       uni.pageScrollTo({ scrollTop: 0, duration: 300 });
     },
-
     prevQuestion() {
       if (this.currentIndex > 0) this.currentIndex--;
     },

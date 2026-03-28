@@ -2,7 +2,8 @@
 const db = uniCloud.database()
 
 exports.main = async (event, context) => {
-  const { userId, limit = 10 } = event
+  // 接收前端传参：userId(用户ID), limit(题量), type(指定题型，可选)
+  const { userId, limit = 10, type } = event
   
   // 默认能力画像（用于未登录或新用户）
   const defaultProfile = { 
@@ -10,48 +11,50 @@ exports.main = async (event, context) => {
     quantitative: 50, 
     reasoning: 50, 
     dataAnalysis: 50, 
-    commonSense: 50 
+    commonSense: 50,
+    politics: 50
   }
   
   let userProfile = defaultProfile;
+  let queryModule = type; // 初始查询目标设为前端传入的 type
 
-  // 1. 获取用户画像
-  if (userId && userId !== 'test-user-id') {
-    try {
-      const userRes = await db.collection('users').doc(userId).get()
-      if (userRes.data && userRes.data.length > 0) {
-        userProfile = userRes.data[0].profile || defaultProfile
+  // 1. 如果前端没有指定 type，则需要通过算法分析出用户的薄弱项
+  if (!queryModule) {
+    if (userId && userId !== 'test-user-id') {
+      try {
+        const userRes = await db.collection('users').doc(userId).get()
+        if (userRes.data && userRes.data.length > 0) {
+          userProfile = userRes.data[0].profile || defaultProfile
+        }
+      } catch (e) {
+        console.error('获取用户信息失败:', e)
       }
-    } catch (e) {
-      console.error('获取用户信息失败:', e)
     }
-  }
-  
-  // 2. 找出最弱的模块（分值最低的）
-  let weakModule = 'verbal'
-  let minScore = 101 
-  
-  for (let key in userProfile) {
-    if (userProfile[key] < minScore) {
-      minScore = userProfile[key];
-      weakModule = key;
+    
+    // 找出画像中分值最低的模块
+    let minScore = 101 
+    for (let key in userProfile) {
+      if (userProfile[key] < minScore) {
+        minScore = userProfile[key];
+        queryModule = key;
+      }
     }
   }
 
   try {
-    // 3. 聚合查询：从数据库随机抽取题目
-    // 注意：聚合查询中使用 match 代替 where 进行筛选
+    // 2. 聚合查询：从数据库随机抽取题目
+    // 使用 match 阶段进行筛选，使用 sample 阶段进行随机
     let res = await db.collection('questions')
       .aggregate()
       .match({
-        type: weakModule // 确保数据库中的字段名是 type
+        type: queryModule 
       })
       .sample({ 
         size: limit 
       })
       .end()
 
-    // 4. 兜底逻辑：如果该薄弱模块还没导入题目，则从全库随机抽取
+    // 3. 兜底逻辑：如果该特定模块还没导入题目（结果为空），则从全库随机抽取题目
     if (!res.data || res.data.length === 0) {
       const allRes = await db.collection('questions')
         .aggregate()
@@ -62,15 +65,16 @@ exports.main = async (event, context) => {
         
       return {
         code: 0,
-        recommendReason: '题库初次加载，为你随机推荐',
+        recommendReason: '题库该模块暂无题目，为你全库随机推荐',
         data: allRes.data
       }
     }
 
-    // 5. 成功返回薄弱项题目
+    // 4. 成功返回结果
+    const moduleLabel = getModuleName(queryModule);
     return {
       code: 0,
-      recommendReason: `基于你的薄弱点: ${getModuleName(weakModule)}`,
+      recommendReason: type ? `专项练习: ${moduleLabel}` : `智能推荐(薄弱项): ${moduleLabel}`,
       data: res.data
     }
     
@@ -84,7 +88,7 @@ exports.main = async (event, context) => {
 };
 
 /**
- * 模块名称映射函数
+ * 模块名称映射函数：将数据库 value 转为���文显示
  */
 function getModuleName(val) {
   const map = { 
@@ -92,7 +96,8 @@ function getModuleName(val) {
     quantitative: '数量关系', 
     reasoning: '判断推理', 
     dataAnalysis: '资料分析', 
-    commonSense: '常识判断' 
+    commonSense: '常识判断',
+    politics: '政治理解'
   }
   return map[val] || '综合模块'
 }

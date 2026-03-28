@@ -31,9 +31,17 @@
       "bsonType": "int",
       "description": "等级"
     },
-    "title": {
+    "todayDone": {
+      "bsonType": "int",
+      "description": "今日做题数"
+    },
+    "lastPracticeDate": {
       "bsonType": "string",
-      "description": "称号"
+      "description": "最后练习日期 (YYYY-MM-DD)"
+    },
+    "moduleStats": {
+      "bsonType": "object",
+      "description": "各模块统计"
     },
     "streak": {
       "bsonType": "int",
@@ -46,6 +54,10 @@
     "accuracy": {
       "bsonType": "int",
       "description": "正确率"
+    },
+    "title": {
+      "bsonType": "string",
+      "description": "称号"
     },
     "studyHours": {
       "bsonType": "double",
