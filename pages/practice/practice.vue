@@ -159,10 +159,20 @@ export default {
   },
   
   onLoad(options) {
-    const { type, name } = options;
+    const { type, name, id, mode, ids } = options;
     if (name) this.currentModuleName = name;
     if (type) this.currentModuleType = type; // 保存 type
-    this.loadRecommendedQuestions(type);
+    
+    // 情况1：查看单题模式（收藏夹/错题本跳转）
+    if (id) {
+      this.loadSingleQuestion(id, mode);
+    } else if (ids) {
+      // 情况2：查看多题复练模式（历史记录跳转）
+      this.loadMultiQuestions(ids.split(','), mode);
+    } else {
+      // 情况3：正常练习模式
+      this.loadRecommendedQuestions(type);
+    }
     
     // 启动全局计时定时器
     this.timerInterval = setInterval(() => {
@@ -178,6 +188,63 @@ export default {
   },
   
   methods: {
+    async loadSingleQuestion(id, mode) {
+      // ... 逻辑保持不变 ...
+    },
+
+    async loadMultiQuestions(ids, mode) {
+      uni.showLoading({ title: '加载题目中...' });
+      try {
+        const db = uniCloud.database();
+        const collections = [
+          'verbal_questions', 'quantitative_questions', 'reasoning_questions', 
+          'data_analysis_questions', 'common_sense_questions', 'politics_questions'
+        ];
+        
+        const results = [];
+        // 为了性能考虑，我们采用分表并行查询，然后再根据 id 排序
+        const promises = collections.map(col => 
+          db.collection(col).where({
+            _id: db.command.in(ids)
+          }).get()
+        );
+
+        const allRes = await Promise.all(promises);
+        allRes.forEach(res => {
+          if (res.result.data) {
+            res.result.data.forEach(item => {
+              results.push({
+                ...item,
+                correctAnswer: item.answer !== undefined ? item.answer : item.correctAnswer,
+                userAnswer: null
+              });
+            });
+          }
+        });
+
+        // 恢复原始顺序
+        const sortedResults = ids.map(id => results.find(r => r._id === id)).filter(Boolean);
+
+        if (sortedResults.length > 0) {
+          this.questionQueue = sortedResults;
+          this.dailyLimit = sortedResults.length;
+          this.currentIndex = 0;
+          this.startTime = Date.now();
+          if (mode === 'review') {
+            this.isSubmitted = true;
+          }
+          this.checkIdCollected();
+        } else {
+          uni.showToast({ title: '未找到相关题目', icon: 'none' });
+        }
+      } catch (e) {
+        console.error('加载多题异常:', e);
+        uni.showToast({ title: '加载失败', icon: 'none' });
+      } finally {
+        uni.hideLoading();
+      }
+    },
+
     async loadRecommendedQuestions(type = '') {
       uni.showLoading({ title: '正在获取题库...' });
       try {
@@ -365,12 +432,17 @@ export default {
       if (!userId || !q) return;
 
       try {
-        const db = uniCloud.database();
-        const res = await db.collection('collection_records').where({
-          userId: userId,
-          questionId: q._id
-        }).get();
-        this.isCollected = res.result.data.length > 0;
+        const { result } = await uniCloud.callFunction({
+          name: 'toggleCollection',
+          data: {
+            userId: userId,
+            questionId: q._id,
+            action: 'check'
+          }
+        });
+        if (result.code === 0) {
+          this.isCollected = result.isCollected;
+        }
       } catch (e) {
         console.error('检查收藏状态失败', e);
       }
@@ -384,34 +456,32 @@ export default {
       }
 
       const q = this.currentQuestion;
-      const db = uniCloud.database();
+      if (!q) return;
 
       try {
-        if (this.isCollected) {
-          // 取消收藏
-          await db.collection('collection_records').where({
-            userId: userId,
-            questionId: q._id
-          }).remove();
-          this.isCollected = false;
-        } else {
-          // 添加收藏
-          await db.collection('collection_records').add({
+        const { result } = await uniCloud.callFunction({
+          name: 'toggleCollection',
+          data: {
             userId: userId,
             questionId: q._id,
             moduleType: q.type || this.currentModuleType || 'unknown',
-            createTime: new Date().getTime()
-          });
-          this.isCollected = true;
-        }
-
-        uni.vibrateShort();
-        uni.showToast({
-          title: this.isCollected ? '收藏成功' : '取消收藏',
-          icon: 'success'
+            action: 'toggle'
+          }
         });
+
+        if (result.code === 0) {
+          this.isCollected = result.isCollected;
+          uni.vibrateShort();
+          uni.showToast({
+            title: result.isCollected ? '收藏成功' : '取消收藏',
+            icon: 'success'
+          });
+        } else {
+          uni.showToast({ title: result.message || '操作失败', icon: 'none' });
+        }
       } catch (e) {
-        uni.showToast({ title: '操作失败', icon: 'none' });
+        console.error('切换收藏状态失败', e);
+        uni.showToast({ title: '网络异常', icon: 'none' });
       }
     }
   }

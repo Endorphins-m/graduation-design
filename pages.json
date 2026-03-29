@@ -18,6 +18,14 @@
       }
     },
     {
+      "path": "pages/history/index",
+      "style": {
+        "navigationBarTitleText": "练习记录",
+        "navigationBarBackgroundColor": "#FFFFFF",
+        "navigationBarTextStyle": "black"
+      }
+    },
+    {
       "path": "pages/assessment/assessment",
       "style": {
         "navigationBarTitleText": "能力测评",
@@ -57,6 +65,22 @@
       "style": {
         "navigationBarTitleText": "修改个人信息",
         "navigationBarBackgroundColor": "#f5f5f5"
+      }
+    },
+    {
+      "path": "pages/wrong-book/index",
+      "style": {
+        "navigationBarTitleText": "我的错题本",
+        "navigationBarBackgroundColor": "#2E5BFF",
+        "navigationBarTextStyle": "white"
+      }
+    },
+    {
+      "path": "pages/favorites/index",
+      "style": {
+        "navigationBarTitleText": "我的收藏",
+        "navigationBarBackgroundColor": "#FAAD14",
+        "navigationBarTextStyle": "white"
       }
     }
   ],

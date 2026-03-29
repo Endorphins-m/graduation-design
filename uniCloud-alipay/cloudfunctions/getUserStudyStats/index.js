@@ -28,10 +28,45 @@ exports.main = async (event, context) => {
     }
 
     // 3. 查询错题集与收藏数量
-    const [wrongCountRes, collectCountRes] = await Promise.all([
-      db.collection('wrong_questions').where({ user_id: userId }).count(),
-      db.collection('collection_records').where({ user_id: userId }).count()
+    const [wrongCountRes, collectCountRes, wrongListRes] = await Promise.all([
+      db.collection('wrong_questions').where({ userId: userId }).count(),
+      db.collection('collection_records').where({ userId: userId }).count(),
+      // 额外拉取错题列表，按模块分类统计，用于计算分模块正确率
+      db.collection('wrong_questions').where({ userId: userId }).field({ moduleType: true }).get()
     ]);
+
+    // 统计各模块错题数 (支持中英文映射)
+    const typeMapping = {
+      '言语理解': 'verbal',
+      '数量关系': 'quantitative',
+      '判断推理': 'reasoning',
+      '资料分析': 'dataAnalysis',
+      '常识判断': 'commonSense',
+      '时政热点': 'politics'
+    };
+
+    const wrongCountMap = {
+      verbal: 0,
+      quantitative: 0,
+      reasoning: 0,
+      dataAnalysis: 0,
+      commonSense: 0,
+      politics: 0
+    };
+
+    if (wrongListRes.data) {
+      wrongListRes.data.forEach(item => {
+        let type = item.moduleType;
+        // 如果是中文，转换为英文 key
+        if (typeMapping[type]) {
+          type = typeMapping[type];
+        }
+        
+        if (wrongCountMap[type] !== undefined) {
+          wrongCountMap[type]++;
+        }
+      });
+    }
 
     // 4. 构建返回数据
     return {
@@ -58,7 +93,9 @@ exports.main = async (event, context) => {
           dataAnalysis: user.moduleStats?.dataAnalysis || 0,
           commonSense: user.moduleStats?.commonSense || 0,
           politics: user.moduleStats?.politics || 0
-        }
+        },
+        // 各模块错题数，用于前端计算正确率
+        wrongCountMap: wrongCountMap
       }
     }
   } catch (e) {

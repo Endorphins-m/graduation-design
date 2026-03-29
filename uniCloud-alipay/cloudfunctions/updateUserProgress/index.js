@@ -93,6 +93,17 @@ exports.main = async (event, context) => {
     // 4. 更新数据库
     await db.collection('users').doc(userId).update(updateData);
 
+    // --- 新增：写入练习日志，用于显示练习记录页面 ---
+    await db.collection('practice_logs').add({
+      userId: userId,
+      totalCount: stats.totalCount,
+      totalCorrect: stats.totalCorrect,
+      duration: stats.duration,
+      moduleType: Object.keys(stats.modules || {}).join(','),
+      questionIds: event.questionIds || [], // 记录本次练习的题目 ID 列表
+      createTime: now.getTime()
+    });
+
     return { code: 0, message: '进度同步成功' };
   } catch (e) {
     return { code: -1, message: e.message };

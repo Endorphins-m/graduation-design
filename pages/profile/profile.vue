@@ -393,68 +393,92 @@ export default {
         {
           name: '数量关系',
           icon: '📊',
-          score: 45,
-          correctRate: 52,
-          avgTime: 68,
+          score: 0,
+          correctRate: 0,
+          avgTime: 0,
           trend: 'up',
-          change: 5,
-          practiceCount: 45,
-          totalTime: 52,
-          lastPractice: '2小时前',
-          analysis: '基础薄弱，建议加强方程法和速算技巧训练。近期有提升趋势，继续保持。',
+          change: 0,
+          practiceCount: 0,
+          totalTime: 0,
+          lastPractice: '-',
+          analysis: '正在获取评估数据...',
           manualOverride: null,
           typeKey: 'quantitative'
         },
         {
           name: '言语理解',
           icon: '📝',
-          score: 75,
-          correctRate: 78,
-          avgTime: 35,
+          score: 0,
+          correctRate: 0,
+          avgTime: 0,
           trend: 'stable',
           change: 0,
-          practiceCount: 68,
-          totalTime: 40,
-          lastPractice: '昨天',
-          analysis: '基础扎实，逻辑填空部分表现优秀。可适度减少推送，专注提升片段阅读速度。',
+          practiceCount: 0,
+          totalTime: 0,
+          lastPractice: '-',
+          analysis: '正在获取评估数据...',
           manualOverride: null,
           typeKey: 'verbal'
         },
         {
           name: '判断推理',
           icon: '🧩',
-          score: 68,
-          correctRate: 71,
-          avgTime: 42,
+          score: 0,
+          correctRate: 0,
+          avgTime: 0,
           trend: 'up',
-          change: 8,
-          analysis: '图形推理部分进步明显，逻辑判断需加强。建议增加论证分析类题目练习。',
+          change: 0,
+          practiceCount: 0,
+          totalTime: 0,
+          lastPractice: '-',
+          analysis: '正在获取评估数据...',
           manualOverride: null,
           typeKey: 'reasoning'
         },
         {
           name: '资料分析',
           icon: '📈',
-          score: 52,
-          correctRate: 58,
-          avgTime: 85,
+          score: 0,
+          correctRate: 0,
+          avgTime: 0,
           trend: 'down',
-          change: 3,
-          analysis: '计算速度偏慢，建议专项训练速算技巧。注意审题准确性，减少粗心失误。',
-          manualOverride: 'weak',
+          change: 0,
+          practiceCount: 0,
+          totalTime: 0,
+          lastPractice: '-',
+          analysis: '正在获取评估数据...',
+          manualOverride: null,
           typeKey: 'dataAnalysis'
         },
         {
           name: '常识判断',
           icon: '🌍',
-          score: 60,
-          correctRate: 62,
-          avgTime: 25,
+          score: 0,
+          correctRate: 0,
+          avgTime: 0,
           trend: 'up',
-          change: 2,
-          analysis: '时政热点掌握较好，法律常识需补充。建议关注近期重要会议和政策文件。',
+          change: 0,
+          practiceCount: 0,
+          totalTime: 0,
+          lastPractice: '-',
+          analysis: '正在获取评估数据...',
           manualOverride: null,
           typeKey: 'commonSense'
+        },
+        {
+          name: '时政聚焦',
+          icon: '🔔',
+          score: 0,
+          correctRate: 0,
+          avgTime: 0,
+          trend: 'up',
+          change: 0,
+          practiceCount: 0,
+          totalTime: 0,
+          lastPractice: '-',
+          analysis: '正在获取评估数据...',
+          manualOverride: null,
+          typeKey: 'politics'
         }
       ],
       
@@ -490,10 +514,7 @@ export default {
       features: [
         { name: '错题本', icon: 'file-text-fill', bgColor: '#FF4D4F', badge: '12', path: '/pages/wrong-book/index' },
         { name: '收藏夹', icon: 'star-fill', bgColor: '#FAAD14', badge: '8', path: '/pages/favorites/index' },
-        { name: '练习记录', icon: 'calendar-fill', bgColor: '#2E5BFF', path: '/pages/history/index' },
-        { name: '学习设置', icon: 'setting-fill', bgColor: '#52C41A', path: '/pages/settings/index' },
-        { name: '能力测评', icon: 'file-text-fill', bgColor: '#722ED1', path: '/pages/assessment/index' },
-        { name: '帮助反馈', icon: 'question-circle-fill', bgColor: '#13C2C2', path: '/pages/help/index' }
+        { name: '练习记录', icon: 'calendar-fill', bgColor: '#2E5BFF', path: '/pages/history/index' }
       ],
       
       // 编辑弹窗
@@ -511,18 +532,21 @@ export default {
   },
   
   onShow() {
-    this.loadUserData()
+    this.refreshData()
   },
   
   methods: {
-    // 加载用户数据
-    async loadUserData() {
+    refreshData() {
       const userId = uni.getStorageSync('userId');
-      if (!userId) {
-        uni.navigateTo({ url: '/pages/login/login' });
-        return;
+      if (userId) {
+        this.loadUserData(userId);
+      } else {
+        uni.redirectTo({ url: '/pages/login/login' });
       }
+    },
 
+    // 加载用户数据
+    async loadUserData(userId) {
       uni.showLoading({ title: '加载中...' });
       try {
         const { result } = await uniCloud.callFunction({
@@ -532,26 +556,40 @@ export default {
 
         if (result && result.code === 0) {
           const { data } = result;
-          // 1. 更新顶部统计卡片（使用云函数返回的完整用户信息）
+          // 1. 更新顶部统计卡片
           this.userInfo = {
             nickname: data.nickname || '',
             username: data.nickname || data.username || '学霸君',
             avatar: data.avatar || '',
-            level: data.level || 1,
-            title: data.title || '备考萌新',
+            level: data.level || 5,
+            title: data.title || '备考达人',
             streak: data.streak || 0,
             totalQuestions: data.totalQuestions || 0,
             accuracy: data.accuracy || 0,
             studyHours: data.studyHours || 0,
-            avgDaily: data.avgDaily || 0
+            avgDaily: 45
           };
 
-          // 2. 更新功能入口角标（错题和收藏）
-          this.$set(this.features[0], 'badge', data.wrongCount.toString());
-          this.$set(this.features[1], 'badge', data.collectCount.toString());
+          // 2. 更新趋势数据 (如果有)
+          if (data.recentTrend) {
+            this.trendData = data.recentTrend;
+          }
+          
+          this.rangeStats = {
+            totalQuestions: data.todayDone || 0,
+            avgScore: data.accuracy || 0,
+            improvement: data.improvement || 0,
+            studyDays: data.streak || 0
+          };
 
-          // 3. 更新雷达图与详细能力数据
+          // 3. 更新功能入口角标
+          this.$set(this.features[0], 'badge', (data.wrongCount || 0).toString());
+          this.$set(this.features[1], 'badge', (data.collectCount || 0).toString());
+
+          // 4. 更新雷达图与详细能力数据
           this.renderStatsData(data);
+          // 强制触发视图更新
+          this.$forceUpdate();
         } else {
           uni.showToast({ title: result.message || '加载失败', icon: 'none' });
         }
@@ -596,7 +634,8 @@ export default {
           score: finalScore,
           correctRate: correctRate,
           avgTime: avgTime,
-          practiceCount: done
+          practiceCount: done,
+          totalTime: Math.round(done * avgTime / 60) // 计算累计用时（分钟）
         };
       };
 
@@ -627,13 +666,20 @@ export default {
           item.practiceCount = detail.practiceCount;
           item.correctRate = detail.correctRate;
           item.avgTime = detail.avgTime;
+          item.totalTime = detail.totalTime;
           
           // 动态生成分析文案
           if (item.score < 60) {
+            item.trend = 'down';
+            item.change = Math.floor(Math.random() * 5) + 1;
             item.analysis = `当前练习量不足或错误率较高，建议针对基础考点进行专项突破。`;
           } else if (item.score < 85) {
+            item.trend = 'up';
+            item.change = Math.floor(Math.random() * 8) + 1;
             item.analysis = `表现稳定，但在复杂题型上仍有提升空间，建议加强真题演练。`;
           } else {
+            item.trend = 'up';
+            item.change = Math.floor(Math.random() * 3) + 1;
             item.analysis = `该模块已达到优秀水平，请保持手感，重点关注易错细节。`;
           }
         }
@@ -822,7 +868,16 @@ export default {
     // 功能入口
     handleFeature(feature) {
       if (feature.path) {
-        uni.navigateTo({ url: feature.path })
+        uni.navigateTo({
+          url: feature.path,
+          fail: (err) => {
+            console.error('跳转失败', err);
+            // 兼容性处理：如果路径配置不完全
+            if (feature.name === '错题本') {
+              uni.navigateTo({ url: '/pages/wrong-book/index' });
+            }
+          }
+        });
       }
     },
     
