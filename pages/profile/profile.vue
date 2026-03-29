@@ -512,49 +512,83 @@ export default {
     }
   },
   
-  onLoad() {
+  onShow() {
     this.loadUserData()
   },
   
   methods: {
     // 加载用户数据
     async loadUserData() {
+      const userId = uni.getStorageSync('userId');
+      if (!userId) {
+        uni.navigateTo({ url: '/pages/login/login' });
+        return;
+      }
+
+      uni.showLoading({ title: '加载中...' });
       try {
-        const db = uniCloud.database()
-        
-        // 获取用户信息
-        const { data: userData } = await db.collection('users')
-          .doc(getApp().globalData.userId)
-          .get()
-        
-        if (userData.length > 0) {
-          this.renderUserData(userData[0])
+        const { result } = await uniCloud.callFunction({
+          name: 'getUserStudyStats',
+          data: { userId }
+        });
+
+        if (result && result.code === 0) {
+          const { data } = result;
+          // 1. 更新顶部统计卡片（使用云函数返回的完整用户信息）
+          this.userInfo = {
+            username: data.nickname || data.username || '学霸君',
+            avatar: data.avatar || '',
+            level: data.level || 1,
+            title: data.title || '备考萌新',
+            streak: data.studyDays || 0,
+            totalQuestions: data.totalQuestions || 0,
+            accuracy: data.accuracy || 0,
+            studyHours: data.studyHours || 0,
+            avgDaily: data.avgDaily || 0
+          };
+
+          // 2. 更新功能入口角标（错题和收藏）
+          this.$set(this.features[0], 'badge', data.wrongCount.toString());
+          this.$set(this.features[1], 'badge', data.collectCount.toString());
+
+          // 3. 更新雷达图与详细能力数据
+          this.renderStatsData(data);
+        } else {
+          uni.showToast({ title: result.message || '加载失败', icon: 'none' });
         }
       } catch (e) {
-        console.error('加载用户数据失败', e)
+        console.error('加载用户数据失败', e);
+        uni.showToast({ title: '网络异常，请稍后重试', icon: 'none' });
+      } finally {
+        uni.hideLoading();
       }
     },
     
-    renderUserData(data) {
-      // 更新能力数据
-      if (data.profile) {
-        this.abilityData = {
-          verbal: data.profile.verbal || 75,
-          quantitative: data.profile.quantitative || 45,
-          reasoning: data.profile.reasoning || 68,
-          dataAnalysis: data.profile.dataAnalysis || 52,
-          commonSense: data.profile.commonSense || 60
-        }
-        
-        // 更新详细数据
-        this.abilityDetails.forEach(item => {
-          const score = this.abilityData[item.typeKey]
-          item.score = score
-          // 根据分数更新其他指标...
-        })
-      }
+    renderStatsData(data) {
+      const stats = data.moduleStats || {};
+      
+      // 简单算法：根据做题数模拟能力分（基础40 + 做题权重，上限100）
+      const calculateScore = (done) => Math.min(40 + (done * 2), 100);
+
+      const moduleScores = {
+        verbal: calculateScore(stats.verbal || 0),
+        quantitative: calculateScore(stats.quantitative || 0),
+        reasoning: calculateScore(stats.reasoning || 0),
+        dataAnalysis: calculateScore(stats.dataAnalysis || 0),
+        commonSense: calculateScore(stats.commonSense || 0),
+        politics: calculateScore(stats.politics || 0)
+      };
+
+      this.abilityData = moduleScores;
+      
+      // 更新下方详细能力列表
+      this.abilityDetails.forEach(item => {
+        const done = stats[item.typeKey] || 0;
+        item.score = moduleScores[item.typeKey];
+        item.practiceCount = done;
+      });
     },
-    
+
     // 展开/收起详情
     toggleExpand(index) {
       this.expandedIndex = this.expandedIndex === index ? null : index
@@ -626,18 +660,15 @@ export default {
         return
       }
       
+      const userId = uni.getStorageSync('userId');
+      if (!userId) return;
+
       try {
-        // 保存到数据库
-        await uniCloud.callFunction({
-          name: 'updateAbilityScore',
-          data: {
-            userId: getApp().globalData.userId,
-            type: this.editingAbility.typeKey,
-            newScore: this.editScore,
-            reason: this.editReason,
-            timestamp: new Date()
-          }
-        })
+        const db = uniCloud.database();
+        const updateObj = {};
+        updateObj[`profile.${this.editingAbility.typeKey}`] = this.editScore;
+        
+        await db.collection('users').doc(userId).update(updateObj);
         
         // 更新本地数据
         this.editingAbility.score = this.editScore
@@ -645,9 +676,6 @@ export default {
         
         uni.showToast({ title: '能力评估已更新', icon: 'success' })
         this.showEditModal = false
-        
-        // 触发计划重新生成
-        this.regeneratePlan()
       } catch (e) {
         uni.showToast({ title: '更新失败', icon: 'none' })
       }
@@ -656,24 +684,20 @@ export default {
     // 设置手动覆盖
     async setManualOverride(item, type) {
       item.manualOverride = type
-      
+      const userId = uni.getStorageSync('userId');
+      if (!userId) return;
+
       try {
-        await uniCloud.callFunction({
-          name: 'setManualOverride',
-          data: {
-            userId: getApp().globalData.userId,
-            type: item.typeKey,
-            override: type
-          }
-        })
+        const db = uniCloud.database();
+        const updateObj = {};
+        updateObj[`manualOverrides.${item.typeKey}`] = type;
+        
+        await db.collection('users').doc(userId).update(updateObj);
         
         uni.showToast({ 
           title: type === 'mastered' ? '已标记为掌握' : type === 'weak' ? '已标记为薄弱' : '已减少推荐',
           icon: 'none'
         })
-        
-        // 主观反馈权重高于单次答题数据，触发计划调整
-        this.adjustPlanForOverride(item, type)
       } catch (e) {
         console.error('设置失败', e)
       }
@@ -682,16 +706,19 @@ export default {
     // 清除覆盖
     async clearOverride(item) {
       item.manualOverride = null
-      
-      await uniCloud.callFunction({
-        name: 'clearManualOverride',
-        data: {
-          userId: getApp().globalData.userId,
-          type: item.typeKey
-        }
-      })
-      
-      uni.showToast({ title: '已恢复自动评估', icon: 'none' })
+      const userId = uni.getStorageSync('userId');
+      if (!userId) return;
+
+      try {
+        const db = uniCloud.database();
+        const updateObj = {};
+        updateObj[`manualOverrides.${item.typeKey}`] = db.command.remove();
+        
+        await db.collection('users').doc(userId).update(updateObj);
+        uni.showToast({ title: '已恢复自动评估', icon: 'none' })
+      } catch (e) {
+        console.error('清除失败', e)
+      }
     },
     
     // 根据覆盖调整计划
@@ -764,13 +791,18 @@ export default {
       uni.showModal({
         title: '确认退出',
         content: '退出后将清除本地登录状态',
+        confirmColor: '#FF4D4F',
         success: (res) => {
           if (res.confirm) {
-            uni.clearStorage()
-            uni.reLaunch({ url: '/pages/login/index' })
+            // 清除本地存储
+            uni.clearStorageSync();
+            // 重定向至登录页
+            uni.reLaunch({
+              url: '/pages/login/login'
+            });
           }
         }
-      })
+      });
     }
   }
 }

@@ -1,0 +1,30 @@
+{
+  "bsonType": "object",
+  "required": ["content", "options", "answer", "difficulty", "analysis"],
+  "permission": {
+    "read": true,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": { "description": "题目唯一标识" },
+    "content": { "bsonType": "string", "description": "图形或表格材料上下文" },
+    "options": { "bsonType": "array", "items": { "bsonType": "string" } },
+    "answer": { "bsonType": "int", "description": "正确答案索引" },
+    "difficulty": { "bsonType": "int", "minimum": 1, "maximum": 5 },
+    "analysis": { "bsonType": "string", "description": "题目解析" },
+    "recommendedTime": { "bsonType": "int", "description": "推荐用时（秒）" },
+    "knowledgePoints": { 
+      "bsonType": "array", 
+      "items": { "bsonType": "string" },
+      "description": "知识点：增长率、比重分析、平均数计算等"
+    },
+    "dataSourceType": {
+      "bsonType": "string",
+      "description": "数据类型：统计表格、折线图、柱状图等"
+    },
+    "source": { "bsonType": "string" },
+    "tags": { "bsonType": "array", "items": { "bsonType": "string" } }
+  }
+}

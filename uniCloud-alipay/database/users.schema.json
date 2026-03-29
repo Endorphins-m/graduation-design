@@ -43,6 +43,11 @@
       "bsonType": "object",
       "description": "各模块统计"
     },
+    "doneQuestionIds": {
+      "bsonType": "array",
+      "description": "已做题目ID列表",
+      "items": { "bsonType": "string" }
+    },
     "streak": {
       "bsonType": "int",
       "description": "连续打卡"

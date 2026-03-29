@@ -1,0 +1,20 @@
+{
+  "bsonType": "object",
+  "required": ["userId", "questionId", "moduleType"],
+  "permission": {
+    "read": "doc.userId == auth.uid",
+    "create": "auth.uid != null",
+    "update": "doc.userId == auth.uid",
+    "delete": "doc.userId == auth.uid"
+  },
+  "properties": {
+    "_id": { "description": "唯一标识" },
+    "userId": { "bsonType": "string", "description": "关联用户ID" },
+    "questionId": { "bsonType": "string", "description": "关联题目ID" },
+    "moduleType": { "bsonType": "string", "description": "题目所属模块(verbal/quantitative等)" },
+    "userAnswer": { "bsonType": "int", "description": "用户最后一次做错的选择" },
+    "errorCount": { "bsonType": "int", "description": "做错的总次数" },
+    "updateTime": { "bsonType": "timestamp", "description": "最后一次出错时间" },
+    "status": { "bsonType": "int", "description": "状态：0-未解决，1-已掌握并移出" }
+  }
+}

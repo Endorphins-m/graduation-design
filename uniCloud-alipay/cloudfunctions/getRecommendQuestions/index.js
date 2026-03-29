@@ -41,20 +41,45 @@ exports.main = async (event, context) => {
     }
   }
 
-  try {
-    // 2. 聚合查询：从数据库随机抽取题目
-    // 使用 match 阶段进行筛选，使用 sample 阶段进行随机
-    let res = await db.collection('questions')
-      .aggregate()
-      .match({
-        type: queryModule 
-      })
-      .sample({ 
-        size: limit 
-      })
-      .end()
+  // 1. 映射表，将 type 映射到对应的数据库集合名称
+  const collectionMap = {
+    verbal: 'verbal_questions',
+    quantitative: 'quantitative_questions',
+    reasoning: 'reasoning_questions',
+    dataAnalysis: 'data_analysis_questions',
+    commonSense: 'common_sense_questions',
+    politics: 'politics_questions'
+  };
 
-    // 3. 兜底逻辑：如果该特定模块还没导入题目（结果为空），则从全库随机抽取题目
+  // --- 新增：获取用户已做题 ID 列表用于排重 ---
+  let doneQuestionIds = [];
+  if (userId && userId !== 'test-user-id') {
+    try {
+      const userRes = await db.collection('users').doc(userId).field({ doneQuestionIds: 1 }).get();
+      if (userRes.data && userRes.data.length > 0) {
+        doneQuestionIds = userRes.data[0].doneQuestionIds || [];
+      }
+    } catch (e) {
+      console.error('获取已做题记录失败:', e);
+    }
+  }
+
+  try {
+    // 2. 确定要查询的集合
+    const targetCollection = collectionMap[type] || 'questions';
+
+    // 3. 构建排重查询条件
+    let query = db.collection(targetCollection).aggregate();
+    if (doneQuestionIds.length > 0) {
+      query = query.match({
+        _id: db.command.nin(doneQuestionIds)
+      });
+    }
+
+    // 4. 执行随机抽题
+    let res = await query.sample({ size: limit }).end();
+
+    // 5. 兜底逻辑：如果该特定模块还没导入新题或已被做完，则从全库随机抽（不带排重，防止完全没题显）
     if (!res.data || res.data.length === 0) {
       const allRes = await db.collection('questions')
         .aggregate()
@@ -65,16 +90,16 @@ exports.main = async (event, context) => {
         
       return {
         code: 0,
-        recommendReason: '题库该模块暂无题目，为你全库随机推荐',
+        recommendReason: '题库该模块暂无新题，为你推荐历史题目',
         data: allRes.data
       }
     }
 
-    // 4. 成功返回结果
-    const moduleLabel = getModuleName(queryModule);
+    // 6. 成功返回结果
+    const moduleLabel = getModuleName(type || 'verbal');
     return {
       code: 0,
-      recommendReason: type ? `专项练习: ${moduleLabel}` : `智能推荐(薄弱项): ${moduleLabel}`,
+      recommendReason: type ? `专项练习: ${moduleLabel}` : `智能推荐`,
       data: res.data
     }
     

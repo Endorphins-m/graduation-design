@@ -1,0 +1,64 @@
+{
+  "bsonType": "object",
+  "required": ["content", "options", "answer", "difficulty", "analysis"],
+  "permission": {
+    "read": true,
+    "create": false,
+    "update": false,
+    "delete": false
+  },
+  "properties": {
+    "_id": {
+      "description": "题目唯一标识"
+    },
+    "content": {
+      "bsonType": "string",
+      "description": "题目题干（支持 HTML/RichText）"
+    },
+    "options": {
+      "bsonType": "array",
+      "description": "选项列表",
+      "items": {
+        "bsonType": "string"
+      },
+      "minItems": 2
+    },
+    "answer": {
+      "bsonType": "int",
+      "description": "正确答案索引（0:A, 1:B, 2:C, 3:D）"
+    },
+    "difficulty": {
+      "bsonType": "int",
+      "description": "难度系数 (1-5)",
+      "minimum": 1,
+      "maximum": 5
+    },
+    "analysis": {
+      "bsonType": "string",
+      "description": "题目解析"
+    },
+    "recommendedTime": {
+      "bsonType": "int",
+      "description": "推荐用时（秒）"
+    },
+    "knowledgePoints": {
+      "bsonType": "array",
+      "description": "核心知识点标签（如：主旨概括、细节理解）",
+      "items": { "bsonType": "string" }
+    },
+    "source": {
+      "bsonType": "string",
+      "description": "题目来源（如：2023国考）"
+    },
+    "tags": {
+      "bsonType": "array",
+      "description": "个性化标签（错题高发、考点热词等）",
+      "items": { "bsonType": "string" }
+    },
+    "skills": {
+      "bsonType": "array",
+      "description": "考察能力素质（逻辑、语感、计算等）",
+      "items": { "bsonType": "string" }
+    }
+  }
+}

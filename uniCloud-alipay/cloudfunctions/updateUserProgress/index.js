@@ -34,6 +34,42 @@ exports.main = async (event, context) => {
       updateData[`moduleStats.${key}`] = dbCmd.inc(stats.modules[key]);
     }
 
+    // --- 新增：记录已做题目 ID 列表，用于排重 ---
+    if (event.questionIds && event.questionIds.length > 0) {
+      updateData.doneQuestionIds = dbCmd.addToSet({
+        $each: event.questionIds
+      });
+    }
+
+    // --- 新增：错题集同步逻辑 ---
+    if (event.wrongQuestions && event.wrongQuestions.length > 0) {
+      for (const w of event.wrongQuestions) {
+        // 使用 upsert 方式更新错题表：如果存在则累加错误次数，不存在则创建
+        await db.collection('wrong_questions').where({
+          userId: userId,
+          questionId: w.id
+        }).update({
+          moduleType: w.moduleType,
+          userAnswer: w.userAnswer,
+          errorCount: dbCmd.inc(1),
+          updateTime: new Date().getTime(),
+          status: 0
+        }).then(async res => {
+          if (res.updated === 0) {
+            await db.collection('wrong_questions').add({
+              userId: userId,
+              questionId: w.id,
+              moduleType: w.moduleType,
+              userAnswer: w.userAnswer,
+              errorCount: 1,
+              updateTime: new Date().getTime(),
+              status: 0
+            });
+          }
+        });
+      }
+    }
+
     // 4. 更新数据库
     await db.collection('users').doc(userId).update(updateData);
 

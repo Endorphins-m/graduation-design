@@ -14,7 +14,13 @@
     
     <!-- 2. 难度标识 -->
     <view class="difficulty-tag" :class="'level-' + (currentQuestion ? currentQuestion.difficulty : 1)" v-if="currentQuestion">
-      <text>难度: {{ '⭐'.repeat(currentQuestion.difficulty) }}</text>
+      <view class="diff-left">
+        <text>难度: {{ '⭐'.repeat(currentQuestion.difficulty || 1) }}</text>
+      </view>
+      <view class="rec-time" v-if="currentQuestion.recommendedTime">
+        <u-icon name="clock" size="24" color="#999"></u-icon>
+        <text>推荐: {{ currentQuestion.recommendedTime }}s</text>
+      </view>
     </view>
     
     <!-- 3. 题目主区域 -->
@@ -121,10 +127,12 @@ export default {
   data() {
     return {
       currentModuleName: '在线练习',
+      currentModuleType: '', // 新增：保存当前练习的模块类型
       dailyLimit: 0,
       currentIndex: 0,
       isSubmitted: false,
       startTime: 0,
+      now: Date.now(), // 新增：用于每秒更新的时间戳
       totalTime: 0,
       isCollected: false,
       recommendReason: '智能推荐练习',
@@ -144,7 +152,8 @@ export default {
       return this.currentIndex === (this.questionQueue.length - 1)
     },
     formatTimer() {
-      const secs = Math.floor((Date.now() - this.startTime) / 1000)
+      const secs = Math.floor((this.now - this.startTime) / 1000)
+      if (secs < 0) return '0:00'
       return `${Math.floor(secs/60)}:${(secs%60).toString().padStart(2,'0')}`
     }
   },
@@ -152,7 +161,20 @@ export default {
   onLoad(options) {
     const { type, name } = options;
     if (name) this.currentModuleName = name;
+    if (type) this.currentModuleType = type; // 保存 type
     this.loadRecommendedQuestions(type);
+    
+    // 启动全局计时定时器
+    this.timerInterval = setInterval(() => {
+      this.now = Date.now();
+    }, 1000);
+  },
+  
+  onUnload() {
+    // 离开页面时清除定时器，防止内存泄漏
+    if (this.timerInterval) {
+      clearInterval(this.timerInterval);
+    }
   },
   
   methods: {
@@ -170,11 +192,15 @@ export default {
         if (res.result && res.result.code === 0) {
           this.questionQueue = res.result.data.map(item => ({
             ...item,
+            // 关键修正：将数据库中的 answer 字段映射为组件使用的 correctAnswer 字段
+            correctAnswer: item.answer !== undefined ? item.answer : item.correctAnswer,
             userAnswer: null 
           }));
           this.dailyLimit = this.questionQueue.length;
           this.currentIndex = 0;
           this.startTime = Date.now();
+          // 加载题目后初始化第一题的收藏状态
+          this.checkIdCollected();
         } else {
           uni.showToast({ title: res.result.message || '加载失败', icon: 'none' });
         }
@@ -273,11 +299,23 @@ export default {
           modules: {}
         };
         
+        // --- 收集错题信息 ---
+        const wrongQuestions = [];
+
         this.questionQueue.forEach(q => {
-          // 确保模块标识存在
-          const moduleKey = q.type || 'unknown';
+          // 优先使用题目自带的 type，如果没有则使用当前模块的 type
+          const moduleKey = q.type || this.currentModuleType || 'unknown';
           if (!stats.modules[moduleKey]) stats.modules[moduleKey] = 0;
           stats.modules[moduleKey]++;
+
+          // 记录错题
+          if (q.userAnswer !== null && q.userAnswer !== q.correctAnswer) {
+            wrongQuestions.push({
+              id: q._id,
+              moduleType: moduleKey,
+              userAnswer: q.userAnswer
+            });
+          }
         });
 
         // 2. 异步上传到云端（不阻塞用户看解析）
@@ -285,10 +323,12 @@ export default {
           name: 'updateUserProgress',
           data: {
             userId: userId,
-            stats: stats
+            stats: stats,
+            questionIds: this.questionQueue.map(q => q._id), // 新增：传题目ID列表用于排重
+            wrongQuestions: wrongQuestions // 新增：传错题列表
           }
         }).then(res => {
-          console.log('进度同步成功:', res);
+          console.log('进度与错题同步成功:', res);
         }).catch(err => {
           console.error('进度同步失败:', err);
         });
@@ -301,19 +341,73 @@ export default {
     },
     prevQuestion() {
       if (this.currentIndex > 0) this.currentIndex--;
+      // 切换题目时刷新该题的收藏状态
+      this.checkIdCollected();
     },
 
     nextQuestion() {
-      if (this.currentIndex < this.questionQueue.length - 1) this.currentIndex++;
+      if (this.currentIndex < this.questionQueue.length - 1) {
+        this.currentIndex++;
+        // 切换题目时刷新该题的收藏状态
+        this.checkIdCollected();
+      }
     },
 
-    toggleCollect() {
-      this.isCollected = !this.isCollected;
-      uni.vibrateShort();
-      uni.showToast({
-        title: this.isCollected ? '收藏成功' : '取消收藏',
-        icon: 'success'
-      });
+    // 检查当前题目是否已收藏
+    async checkIdCollected() {
+      const userId = uni.getStorageSync('userId');
+      const q = this.currentQuestion;
+      if (!userId || !q) return;
+
+      try {
+        const db = uniCloud.database();
+        const res = await db.collection('collection_records').where({
+          userId: userId,
+          questionId: q._id
+        }).get();
+        this.isCollected = res.result.data.length > 0;
+      } catch (e) {
+        console.error('检查收藏状态失败', e);
+      }
+    },
+
+    async toggleCollect() {
+      const userId = uni.getStorageSync('userId');
+      if (!userId) {
+        uni.showToast({ title: '请先登录', icon: 'none' });
+        return;
+      }
+
+      const q = this.currentQuestion;
+      const db = uniCloud.database();
+
+      try {
+        if (this.isCollected) {
+          // 取消收藏
+          await db.collection('collection_records').where({
+            userId: userId,
+            questionId: q._id
+          }).remove();
+          this.isCollected = false;
+        } else {
+          // 添加收藏
+          await db.collection('collection_records').add({
+            userId: userId,
+            questionId: q._id,
+            moduleType: q.type || this.currentModuleType || 'unknown',
+            createTime: new Date().getTime()
+          });
+          this.isCollected = true;
+        }
+
+        uni.vibrateShort();
+        uni.showToast({
+          title: this.isCollected ? '收藏成功' : '取消收藏',
+          icon: 'success'
+        });
+      } catch (e) {
+        uni.showToast({ title: '操作失败', icon: 'none' });
+      }
     }
   }
 }
@@ -329,7 +423,11 @@ export default {
   .question-counter { font-size: 24rpx; color: #999; }
 }
 
-.difficulty-tag { padding: 10rpx 30rpx; font-size: 24rpx; color: #999; }
+.difficulty-tag { 
+  padding: 10rpx 30rpx; font-size: 24rpx; color: #999; 
+  display: flex; justify-content: space-between; align-items: center;
+  .rec-time { display: flex; align-items: center; gap: 6rpx; color: #ffa940; font-weight: 500; }
+}
 .question-card { background: #fff; margin: 20rpx; padding: 40rpx 30rpx; border-radius: 20rpx; box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.03); }
 .source-tag { font-size: 22rpx; color: #2e5bff; background: #eef2ff; padding: 4rpx 12rpx; border-radius: 4rpx; display: inline-block; margin-bottom: 20rpx; }
 .question-content { font-size: 32rpx; line-height: 1.6; color: #333; margin-bottom: 40rpx; font-weight: 500; }

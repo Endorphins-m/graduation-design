@@ -27,15 +27,27 @@ exports.main = async (event, context) => {
       todayDone = user.todayDone || 0;
     }
 
-    // 3. 构建返回数据
+    // 3. 查询错题集与收藏数量
+    const [wrongCountRes, collectCountRes] = await Promise.all([
+      db.collection('wrong_questions').where({ user_id: userId }).count(),
+      db.collection('collection_records').where({ user_id: userId }).count()
+    ]);
+
+    // 4. 构建返回数据
     return {
       code: 0,
       data: {
+        nickname: user.nickname || '考公达人',
+        username: user.username || 'user_' + userId.slice(-4),
+        avatar: user.avatar || '/static/default-avatar.png',
+        level: user.level || '初级学员',
         todayDone: todayDone,
         dailyTarget: user.learningPrefs?.dailyLimit || 50,
         totalQuestions: user.totalQuestions || 0,
         accuracy: user.accuracy || 0,
         studyDays: user.streak || 0,
+        wrongCount: wrongCountRes.total || 0,
+        collectCount: collectCountRes.total || 0,
         // 各模块进度
         moduleStats: {
           verbal: user.moduleStats?.verbal || 0,
