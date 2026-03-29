@@ -293,9 +293,11 @@ export default {
       // --- 新增：计算并同步进度 ---
       const userId = uni.getStorageSync('userId');
       if (userId) {
-        // 1. 统计本次练习各模块数量
+        // 1. 统计本次练习各模块数量和正确数
         const stats = {
           totalCount: this.questionQueue.length,
+          totalCorrect: 0,
+          duration: this.totalTime, // 本次练习时长（秒）
           modules: {}
         };
         
@@ -308,8 +310,11 @@ export default {
           if (!stats.modules[moduleKey]) stats.modules[moduleKey] = 0;
           stats.modules[moduleKey]++;
 
-          // 记录错题
-          if (q.userAnswer !== null && q.userAnswer !== q.correctAnswer) {
+          // 记录正确数
+          if (q.userAnswer === q.correctAnswer) {
+            stats.totalCorrect++;
+          } else if (q.userAnswer !== null) {
+            // 记录错题
             wrongQuestions.push({
               id: q._id,
               moduleType: moduleKey,

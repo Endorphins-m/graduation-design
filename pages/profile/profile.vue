@@ -2,41 +2,41 @@
   <view class="profile-container">
     <!-- 用户信息卡片 -->
     <view class="user-card">
+      <view class="card-bg-decoration"></view>
       <view class="user-info">
-        <u-avatar :src="userInfo.avatar" size="120" bg-color="#2E5BFF"></u-avatar>
+        <view class="avatar-wrapper">
+          <u-avatar :src="userInfo.avatar" size="140" bg-color="#FFFFFF"></u-avatar>
+          <view class="lv-badge">Lv.{{ userInfo.level }}</view>
+        </view>
         <view class="user-details">
-          <text class="username">{{ userInfo.username }}</text>
-          <view class="user-badges">
-            <u-tag :text="'Lv.' + userInfo.level" type="primary" size="mini" mode="dark"></u-tag>
-            <u-tag :text="userInfo.title" type="warning" mode="light" size="mini"></u-tag>
+          <view class="name-row">
+            <text class="username">{{ userInfo.nickname || userInfo.username }}</text>
+            <view class="edit-icon-btn" @click="goSettings">
+              <u-icon name="edit-pen-fill" color="rgba(255,255,255,0.9)" size="36"></u-icon>
+            </view>
           </view>
-          <view class="streak-box">
-            <u-icon name="fire-fill" color="#FF4D4F" size="32"></u-icon>
-            <text class="streak">连续打卡 {{ userInfo.streak }} 天</text>
+          
+          <view class="streak-badge" @click="showStreakDetail">
+            <text class="streak-icon">⚡</text>
+            <text class="streak-label">已累计备考</text>
+            <text class="streak-val">{{ userInfo.streak }}</text>
+            <text class="streak-unit">天</text>
           </view>
         </view>
-        <u-icon name="setting-fill" color="#FFFFFF" size="48" @click="goSettings"></u-icon>
       </view>
       
-      <view class="user-stats">
-        <view class="stat-box">
-          <text class="stat-num">{{ userInfo.totalQuestions }}</text>
-          <text class="stat-label">总刷题</text>
+      <view class="user-stats-grid">
+        <view class="stat-card">
+          <text class="stat-v">{{ userInfo.totalQuestions }}</text>
+          <text class="stat-k">总刷题</text>
         </view>
-        <view class="stat-divider"></view>
-        <view class="stat-box">
-          <text class="stat-num">{{ userInfo.accuracy }}%</text>
-          <text class="stat-label">正确率</text>
+        <view class="stat-card">
+          <text class="stat-v">{{ userInfo.accuracy }}%</text>
+          <text class="stat-k">正确率</text>
         </view>
-        <view class="stat-divider"></view>
-        <view class="stat-box">
-          <text class="stat-num">{{ userInfo.studyHours }}h</text>
-          <text class="stat-label">学习时长</text>
-        </view>
-        <view class="stat-divider"></view>
-        <view class="stat-box">
-          <text class="stat-num">{{ userInfo.avgDaily }}m</text>
-          <text class="stat-label">日均学习</text>
+        <view class="stat-card">
+          <text class="stat-v">{{ userInfo.studyHours }}h</text>
+          <text class="stat-k">学习时长</text>
         </view>
       </view>
     </view>
@@ -48,21 +48,19 @@
           <text class="card-title">能力画像</text>
           <u-icon name="question-circle" color="#9CA3AF" size="32" @click="showAbilityHelp"></u-icon>
         </view>
-        <text class="update-info">下次全量更新: {{ nextUpdate }}</text>
+        <text class="update-info">点击圆点查看详情</text>
       </view>
       
-      <view class="radar-wrapper">
+      <view class="radar-section">
         <ability-radar 
           :data="abilityData" 
-          :size="320"
-          @regionClick="onRadarRegionClick"
         ></ability-radar>
       </view>
       
       <view class="radar-legend">
         <view class="legend-item">
           <view class="legend-color weak"></view>
-          <text class="legend-text">薄弱 (<60分)</text>
+          <text class="legend-text">薄弱 (&lt;60分)</text>
         </view>
         <view class="legend-item">
           <view class="legend-color base"></view>
@@ -70,7 +68,7 @@
         </view>
         <view class="legend-item">
           <view class="legend-color strong"></view>
-          <text class="legend-text">良好 (>80分)</text>
+          <text class="legend-text">良好 (&gt;80分)</text>
         </view>
       </view>
       
@@ -536,11 +534,12 @@ export default {
           const { data } = result;
           // 1. 更新顶部统计卡片（使用云函数返回的完整用户信息）
           this.userInfo = {
+            nickname: data.nickname || '',
             username: data.nickname || data.username || '学霸君',
             avatar: data.avatar || '',
             level: data.level || 1,
             title: data.title || '备考萌新',
-            streak: data.studyDays || 0,
+            streak: data.streak || 0,
             totalQuestions: data.totalQuestions || 0,
             accuracy: data.accuracy || 0,
             studyHours: data.studyHours || 0,
@@ -566,26 +565,78 @@ export default {
     
     renderStatsData(data) {
       const stats = data.moduleStats || {};
+      const wrongCountMap = data.wrongCountMap || {}; // 假设后端返回各模块错题数
       
-      // 简单算法：根据做题数模拟能力分（基础40 + 做题权重，上限100）
-      const calculateScore = (done) => Math.min(40 + (done * 2), 100);
-
-      const moduleScores = {
-        verbal: calculateScore(stats.verbal || 0),
-        quantitative: calculateScore(stats.quantitative || 0),
-        reasoning: calculateScore(stats.reasoning || 0),
-        dataAnalysis: calculateScore(stats.dataAnalysis || 0),
-        commonSense: calculateScore(stats.commonSense || 0),
-        politics: calculateScore(stats.politics || 0)
+      /**
+       * 综合评分算法 V2.0
+       * @param {string} key 模块键名
+       * @param {number} done 做题总数
+       * @returns {Object} 包含各项指标的对象
+       */
+      const calculateAdvancedScore = (key, done) => {
+        if (!done || done === 0) return { score: 40, correctRate: 0, avgTime: 0 };
+        
+        // 1. 获取该模块错题数计算正确率 (模拟或从返回数据取)
+        const wrong = wrongCountMap[key] || 0;
+        const correctRate = Math.round(((done - wrong) / done) * 100);
+        
+        // 2. 模拟平均时间 (根据模块特性设定基准)
+        const baseTimeMap = { verbal: 45, quantitative: 90, reasoning: 50, dataAnalysis: 120, commonSense: 30, politics: 30 };
+        const avgTime = Math.max(15, baseTimeMap[key] - Math.floor(done / 10)); // 熟练度越高解析越快
+        
+        // 3. 核心算法逻辑:
+        // 基础分(40) + 活跃度(30%权重) + 正确率(50%权重) + 速率(20%权重)
+        const activityScore = Math.min(done * 1.5, 30); // 做 20 题可拿满活跃分
+        const accuracyScore = (correctRate / 100) * 50; 
+        const speedScore = Math.min((baseTimeMap[key] / avgTime) * 20, 20);
+        
+        const finalScore = Math.min(Math.round(40 + activityScore + accuracyScore + speedScore), 100);
+        
+        return {
+          score: finalScore,
+          correctRate: correctRate,
+          avgTime: avgTime,
+          practiceCount: done
+        };
       };
 
-      this.abilityData = moduleScores;
+      const moduleDetails = {
+        verbal: calculateAdvancedScore('verbal', stats.verbal || 0),
+        quantitative: calculateAdvancedScore('quantitative', stats.quantitative || 0),
+        reasoning: calculateAdvancedScore('reasoning', stats.reasoning || 0),
+        dataAnalysis: calculateAdvancedScore('dataAnalysis', stats.dataAnalysis || 0),
+        commonSense: calculateAdvancedScore('commonSense', stats.commonSense || 0),
+        politics: calculateAdvancedScore('politics', stats.politics || 0)
+      };
+
+      // 更新雷达图数据源
+      this.abilityData = {
+        verbal: moduleDetails.verbal.score,
+        quantitative: moduleDetails.quantitative.score,
+        reasoning: moduleDetails.reasoning.score,
+        dataAnalysis: moduleDetails.dataAnalysis.score,
+        commonSense: moduleDetails.commonSense.score,
+        politics: moduleDetails.politics.score
+      };
       
       // 更新下方详细能力列表
       this.abilityDetails.forEach(item => {
-        const done = stats[item.typeKey] || 0;
-        item.score = moduleScores[item.typeKey];
-        item.practiceCount = done;
+        const detail = moduleDetails[item.typeKey];
+        if (detail) {
+          item.score = detail.score;
+          item.practiceCount = detail.practiceCount;
+          item.correctRate = detail.correctRate;
+          item.avgTime = detail.avgTime;
+          
+          // 动态生成分析文案
+          if (item.score < 60) {
+            item.analysis = `当前练习量不足或错误率较高，建议针对基础考点进行专项突破。`;
+          } else if (item.score < 85) {
+            item.analysis = `表现稳定，但在复杂题型上仍有提升空间，建议加强真题演练。`;
+          } else {
+            item.analysis = `该模块已达到优秀水平，请保持手感，重点关注易错细节。`;
+          }
+        }
       });
     },
 
@@ -635,7 +686,8 @@ export default {
         'quantitative': '数量关系',
         'reasoning': '判断推理',
         'dataAnalysis': '资料分析',
-        'commonSense': '常识判断'
+        'commonSense': '常识判断',
+        'politics': '时政聚焦'
       }
       
       const abilityName = abilityMap[type]
@@ -776,7 +828,9 @@ export default {
     
     // 其他操作
     goSettings() {
-      uni.navigateTo({ url: '/pages/settings/index' })
+      uni.navigateTo({
+        url: '/pages/profile/user-edit'
+      });
     },
     
     showAbilityHelp() {
@@ -818,78 +872,141 @@ export default {
 /* 用户卡片 */
 .user-card {
   background: linear-gradient(135deg, #2E5BFF 0%, #1E40AF 100%);
-  border-radius: 0 0 32rpx 32rpx;
-  padding: 40rpx 30rpx;
-  color: #FFFFFF;
+  padding: 80rpx 40rpx 60rpx;
+  position: relative;
+  overflow: hidden;
+  border-radius: 0 0 60rpx 60rpx;
+}
+
+.card-bg-decoration {
+  position: absolute;
+  top: -100rpx;
+  right: -100rpx;
+  width: 400rpx;
+  height: 400rpx;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  border-radius: 50%;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: 30rpx;
+  position: relative;
+  z-index: 2;
+}
+
+.avatar-wrapper {
+  position: relative;
+  border: 4rpx solid rgba(255, 255, 255, 0.4);
+  border-radius: 50%;
+  padding: 6rpx;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.lv-badge {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  background: #FFD700;
+  color: #1E40AF;
+  font-size: 20rpx;
+  font-weight: bold;
+  padding: 2rpx 12rpx;
+  border-radius: 20rpx;
+  border: 2rpx solid #FFFFFF;
 }
 
 .user-details {
   flex: 1;
-  margin-left: 24rpx;
+  margin-left: 32rpx;
+}
+
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 20rpx;
 }
 
 .username {
-  font-size: 40rpx;
+  font-size: 48rpx;
   font-weight: bold;
-  display: block;
-  margin-bottom: 12rpx;
+  color: #FFFFFF;
 }
 
-.user-badges {
-  display: flex;
-  gap: 12rpx;
-  margin-bottom: 12rpx;
-}
-
-.streak-box {
-  display: flex;
-  align-items: center;
-  gap: 8rpx;
-}
-
-.streak {
-  font-size: 26rpx;
-  opacity: 0.9;
-}
-
-.user-stats {
-  display: flex;
-  justify-content: space-around;
-  align-items: center;
+.edit-icon-btn {
   background: rgba(255, 255, 255, 0.15);
-  border-radius: 16rpx;
-  padding: 24rpx;
-  backdrop-filter: blur(10px);
-}
-
-.stat-box {
+  padding: 10rpx;
+  border-radius: 50%;
   display: flex;
-  flex-direction: column;
   align-items: center;
+  justify-content: center;
 }
 
-.stat-num {
+.streak-badge {
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.15);
+  padding: 10rpx 24rpx;
+  border-radius: 100rpx;
+  width: fit-content;
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+}
+
+.streak-icon {
+  font-size: 32rpx;
+  margin-right: 12rpx;
+}
+
+.streak-label {
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, 0.8);
+  margin-right: 10rpx;
+}
+
+.streak-val {
   font-size: 36rpx;
   font-weight: bold;
-  margin-bottom: 8rpx;
+  color: #FFFFFF;
+  margin-right: 4rpx;
 }
 
-.stat-label {
-  font-size: 24rpx;
+.streak-unit {
+  font-size: 22rpx;
+  color: #FFFFFF;
   opacity: 0.8;
 }
 
-.stat-divider {
-  width: 2rpx;
-  height: 60rpx;
-  background: rgba(255, 255, 255, 0.3);
+.user-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20rpx;
+  margin-top: 50rpx;
+  position: relative;
+  z-index: 2;
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.12);
+  padding: 24rpx;
+  border-radius: 24rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  backdrop-filter: blur(10px);
+  border: 1rpx solid rgba(255, 255, 255, 0.1);
+}
+
+.stat-v {
+  font-size: 36rpx;
+  font-weight: bold;
+  color: #FFFFFF;
+  margin-bottom: 4rpx;
+}
+
+.stat-k {
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, 0.7);
 }
 
 /* 通用卡片样式 */

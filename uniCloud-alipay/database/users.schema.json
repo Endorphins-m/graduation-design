@@ -27,6 +27,14 @@
       "bsonType": "string",
       "description": "头像"
     },
+    "nickname": {
+      "bsonType": "string",
+      "description": "昵称"
+    },
+    "bio": {
+      "bsonType": "string",
+      "description": "个人简介"
+    },
     "level": {
       "bsonType": "int",
       "description": "等级"
