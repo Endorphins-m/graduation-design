@@ -18,19 +18,19 @@ function response(code, message, data = null) {
 }
 
 exports.main = async (event, context) => {
-	const { phone, code, password } = event
+	const { username, password } = event
 	
-	console.log('注册请求:', { phone, code: '***', password: '***' })
+	console.log('注册请求:', { username, password: '***' })
 	
 	// 参数验证
-	if (!phone || !code || !password) {
-		return response(-1, '手机号、验证码和密码不能为空')
+	if (!username || !password) {
+		return response(-1, '账号和密码不能为空')
 	}
 	
-	// 手机号格式验证
-	const phoneReg = /^1[3-9]\d{9}$/
-	if (!phoneReg.test(phone)) {
-		return response(-1, '手机号格式错误')
+	// 账号格式验证 (3-20位字母数字)
+	const usernameReg = /^[a-zA-Z0-9_]{3,20}$/
+	if (!usernameReg.test(username)) {
+		return response(-1, '账号应为3-20位字母、数字或下划线')
 	}
 	
 	// 密码长度验证
@@ -39,33 +39,13 @@ exports.main = async (event, context) => {
 	}
 	
 	try {
-		// 验证验证码
-		const now = Date.now()
-		const { data: records } = await db.collection('verify_codes')
-			.where({
-				phone: phone,
-				code: code,
-				type: 'register',
-				used: false,
-				expireAt: db.command.gt(now)
-			})
-			.orderBy('createdAt', 'desc')
-			.limit(1)
-			.get()
-		
-		console.log('验证码查询结果:', records.length)
-		
-		if (records.length === 0) {
-			return response(-1, '验证码错误或已过期')
-		}
-		
-		// 检查手机号是否已注册
+		// 检查账号是否已注册
 		const { data: existing } = await db.collection('users')
-			.where({ phone: phone })
+			.where({ username: username })
 			.get()
 		
 		if (existing.length > 0) {
-			return response(-1, '该手机号已注册，请直接登录')
+			return response(-1, '该账号已存在，请尝试其他账号')
 		}
 		
 		// 密码加密
@@ -73,9 +53,8 @@ exports.main = async (event, context) => {
 		
 		// 创建用户
 		const result = await db.collection('users').add({
-			phone: phone,
+			username: username,
 			password: hashedPassword,
-			username: '用户' + phone.slice(-4),
 			avatar: '',
 			level: 1,
 			title: '备考新手',
@@ -101,11 +80,6 @@ exports.main = async (event, context) => {
 		})
 		
 		console.log('用户创建成功:', result.id)
-		
-		// 标记验证码已使用
-		await db.collection('verify_codes').doc(records[0]._id).update({
-			used: true
-		})
 		
 		// 生成Token
 		const token = generateToken(result.id)

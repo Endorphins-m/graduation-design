@@ -7,29 +7,31 @@
 6 silly config load:file:E:\node.js\node.js2\node_global\etc\npmrc
 7 verbose title npm install types-registry@latest
 8 verbose argv "install" "--ignore-scripts" "types-registry@latest"
-9 verbose logfile logs-max:10 dir:C:\Users\20173\Desktop\graduation design\person\.npm_cache\_logs\2026-03-28T13_57_12_523Z-
-10 verbose logfile C:\Users\20173\Desktop\graduation design\person\.npm_cache\_logs\2026-03-28T13_57_12_523Z-debug-0.log
+9 verbose logfile logs-max:10 dir:C:\Users\20173\Desktop\graduation design\person\.npm_cache\_logs\2026-03-31T08_23_56_053Z-
+10 verbose logfile C:\Users\20173\Desktop\graduation design\person\.npm_cache\_logs\2026-03-31T08_23_56_053Z-debug-0.log
 11 silly packumentCache heap:2197815296 maxSize:549453824 maxEntrySize:274726912
 12 silly logfile start cleaning logs, removing 1 files
 13 silly logfile done cleaning log files
 14 silly packumentCache corgi:https://registry.npmmirror.com/types-registry cache-miss
-15 http fetch GET 200 https://registry.npmmirror.com/types-registry 345ms (cache revalidated)
-16 silly packumentCache corgi:https://registry.npmmirror.com/types-registry set size:456026 disposed:false
+15 http fetch GET 200 https://registry.npmmirror.com/types-registry 288ms (cache revalidated)
+16 silly packumentCache corgi:https://registry.npmmirror.com/types-registry set size:456779 disposed:false
 17 silly idealTree buildDeps
-18 silly fetch manifest types-registry@0.1.762
+18 silly fetch manifest types-registry@0.1.763
 19 silly packumentCache full:https://registry.npmmirror.com/types-registry cache-miss
-20 http fetch GET 200 https://registry.npmmirror.com/types-registry 194ms (cache revalidated)
-21 silly packumentCache full:https://registry.npmmirror.com/types-registry set size:1233135 disposed:false
-22 silly placeDep ROOT types-registry@0.1.762 REPLACE for:  want: 0.1.762
+20 http fetch GET 200 https://registry.npmmirror.com/types-registry 83ms (cache revalidated)
+21 silly packumentCache full:https://registry.npmmirror.com/types-registry set size:1234989 disposed:false
+22 silly placeDep ROOT types-registry@0.1.763 REPLACE for:  want: 0.1.763
 23 silly reify moves {}
 24 silly audit bulk request {
+24 silly audit   '@types/node': [ '25.5.0' ],
 24 silly audit   '@types/react': [ '19.2.14' ],
 24 silly audit   csstype: [ '3.2.3' ],
-24 silly audit   'types-registry': [ '0.1.762' ]
+24 silly audit   'undici-types': [ '7.18.2' ],
+24 silly audit   'types-registry': [ '0.1.763' ]
 24 silly audit }
-25 http fetch POST 404 https://registry.npmmirror.com/-/npm/v1/security/advisories/bulk 16ms
+25 http fetch POST 404 https://registry.npmmirror.com/-/npm/v1/security/advisories/bulk 68ms
 26 silly audit bulk request failed [object Object]
-27 http fetch POST 404 https://registry.npmmirror.com/-/npm/v1/security/audits/quick 44ms
+27 http fetch POST 404 https://registry.npmmirror.com/-/npm/v1/security/audits/quick 31ms
 28 verbose audit error HttpErrorGeneral: 404 Not Found - POST https://registry.npmmirror.com/-/npm/v1/security/audits/quick - [NOT_IMPLEMENTED] /-/npm/v1/security/* not implemented yet
 28 verbose audit error     at E:\node.js\node.js2\node_modules\npm\node_modules\npm-registry-fetch\lib\check-response.js:95:15
 28 verbose audit error     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
@@ -41,14 +43,14 @@
 28 verbose audit error     at async module.exports (E:\node.js\node.js2\node_modules\npm\lib\cli\entry.js:74:5) {
 28 verbose audit error   headers: [Object: null prototype] {
 28 verbose audit error     server: [ 'Tengine' ],
-28 verbose audit error     date: [ 'Sat, 28 Mar 2026 13:57:25 GMT' ],
+28 verbose audit error     date: [ 'Tue, 31 Mar 2026 08:24:10 GMT' ],
 28 verbose audit error     'content-type': [ 'application/json' ],
 28 verbose audit error     'transfer-encoding': [ 'chunked' ],
 28 verbose audit error     connection: [ 'keep-alive' ],
 28 verbose audit error     'strict-transport-security': [ 'max-age=5184000' ],
-28 verbose audit error     via: [ 'kunlun6.cn7728[,404666]' ],
+28 verbose audit error     via: [ 'kunlun8.cn8884[,404666]' ],
 28 verbose audit error     'timing-allow-origin': [ '*' ],
-28 verbose audit error     eagleid: [ '7030a38e17747062459118694e' ],
+28 verbose audit error     eagleid: [ '78e23b9e17749454509182098e' ],
 28 verbose audit error     'x-fetch-attempts': [ '1' ]
 28 verbose audit error   },
 28 verbose audit error   statusCode: 404,

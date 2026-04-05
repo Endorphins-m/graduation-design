@@ -3,11 +3,11 @@ const db = uniCloud.database()
 const { generateToken, hashPassword, response, getClientIP } = require('../common/utils.js')
 
 exports.main = async (event, context) => {
-  const { phone, password } = event
+  const { username, password } = event
   
   // 参数验证
-  if (!phone || !password) {
-    return response(-1, '手机号和密码不能为空')
+  if (!username || !password) {
+    return response(-1, '账号和密码不能为空')
   }
   
   if (password.length < 6) {
@@ -17,7 +17,7 @@ exports.main = async (event, context) => {
   try {
     // 查找用户
     const { data: users } = await db.collection('users')
-      .where({ phone: phone })
+      .where({ username: username })
       .get()
     
     if (users.length === 0) {
@@ -32,7 +32,7 @@ exports.main = async (event, context) => {
       // 记录失败日志
       await db.collection('login_logs').add({
         userId: user._id,
-        phone: phone,
+        username: username,
         type: 'password',
         ip: getClientIP(context),
         device: context.OS,
@@ -64,7 +64,7 @@ exports.main = async (event, context) => {
     // 记录成功日志
     await db.collection('login_logs').add({
       userId: user._id,
-      phone: phone,
+      username: username,
       type: 'password',
       ip: getClientIP(context),
       device: context.OS,

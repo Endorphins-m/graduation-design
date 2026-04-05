@@ -2,6 +2,71 @@
 const db = uniCloud.database()
 const $ = db.command.aggregate
 
+// 获取最近7天刷题趋势
+async function getRecentTrend(userId) {
+  const days = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+  const now = new Date();
+  const trend = [];
+  
+  try {
+    // 1. 获取过去 7 天的日期字符串数组
+    const last7Days = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      const dateStr = d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+      last7Days.push({
+        dateStr,
+        dayName: days[d.getDay()]
+      });
+    }
+
+    // 2. 从 practice_logs 聚合统计每日刷题量
+    // 修正：删除重复定义的 logsRes 变量，并修复聚合语法错误
+    const logsRes = await db.collection('practice_logs').aggregate()
+      .match({
+        userId: userId,
+        createTime: db.command.gte(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      })
+      .project({
+        date: $.dateToString({
+          date: $.add([new Date(0), '$createTime']),
+          format: '%Y-%m-%d'
+        }),
+        totalCount: 1
+      })
+      .group({
+        _id: '$date',
+        count: $.sum('$totalCount')
+      })
+      .end();
+
+    const logsMap = {};
+    if (logsRes.data) {
+      logsRes.data.forEach(item => {
+        // 去掉日期中不必要的 0 以匹配 2024-4-5 格式
+        const parts = item._id.split('-');
+        const normalizedId = `${parseInt(parts[0])}-${parseInt(parts[1])}-${parseInt(parts[2])}`;
+        logsMap[normalizedId] = item.count;
+      });
+    }
+
+    const trend = [];
+    last7Days.forEach(day => {
+      trend.push({
+        date: day.dayName,
+        score: logsMap[day.dateStr] || 0
+      });
+    });
+    return trend;
+  } catch (e) {
+    console.error('获取趋势失败:', e);
+    // 兜底返回 0
+    return days.map(d => ({ date: d, score: 0 }));
+  }
+  
+  return trend;
+}
+
 exports.main = async (event, context) => {
   const { userId } = event
   if (!userId) {
@@ -15,6 +80,18 @@ exports.main = async (event, context) => {
       return { code: -1, message: '用户不存在' }
     }
     const user = userRes.data[0]
+    
+    // --- 新增：知识点能力画像处理 ---
+    const profile = user.profile || {};
+    const knowledgePoints = profile.knowledgePoints || {};
+    const skills = profile.skills || {};
+    
+    // 转换为前端需要的格式 (例如：计算正确率得分)
+    const formattedKP = {};
+    for (let kp in knowledgePoints) {
+      const data = knowledgePoints[kp];
+      formattedKP[kp] = data.total > 0 ? Math.round((data.correct / data.total) * 100) : 0;
+    }
 
     // 2. 获取今日练习统计
     // 逻辑优化：直接从用户表的 todayDone 字段获取，确保与更新逻辑一致
@@ -68,7 +145,15 @@ exports.main = async (event, context) => {
       });
     }
 
-    // 4. 构建返回数据
+    // 4. 构建返回数据 (计算提升幅度)
+    const statsHistory = user.statsHistory || [];
+    let improvement = 0;
+    if (statsHistory.length >= 2) {
+      const last = statsHistory[statsHistory.length - 1].accuracy || 0;
+      const prev = statsHistory[statsHistory.length - 2].accuracy || 0;
+      improvement = last - prev;
+    }
+
     return {
       code: 0,
       data: {
@@ -82,7 +167,7 @@ exports.main = async (event, context) => {
         totalQuestions: user.totalQuestions || 0,
         accuracy: user.accuracy || 0,
         studyHours: user.studyHours || 0,
-        streak: user.streak || 0,
+        improvement: improvement, // 返回真实的提升幅度
         wrongCount: wrongCountRes.total || 0,
         collectCount: collectCountRes.total || 0,
         // 各模块进度
@@ -95,13 +180,18 @@ exports.main = async (event, context) => {
           politics: user.moduleStats?.politics || 0
         },
         // 各模块错题数，用于前端计算正确率
-        wrongCountMap: wrongCountMap
+        wrongCountMap: wrongCountMap,
+        // 添加细粒度能力画像数据
+        skills: skills, // 技能原始分 (2/题)
+        knowledgePoints: formattedKP, // 知识点正确率 (0-100)
+        // 5. 获取最近7天刷题趋势
+        recentTrend: await getRecentTrend(userId)
       }
     }
-  } catch (e) {
-    return {
-      code: -1,
-      message: '获取统计失败：' + e.message
-    }
+  } catch (error) {
+    console.error('获取学习报告失败:', error)
+    return { code: -1, message: '获取学习报告失败: ' + error.message }
   }
 }
+
+// 移除原本错误的导出方式

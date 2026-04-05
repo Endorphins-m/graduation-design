@@ -51,6 +51,9 @@ exports.main = async (event, context) => {
     politics: 'politics_questions'
   };
 
+  // 2. 确定要查询的集合
+  const targetCollection = collectionMap[type] || 'questions';
+
   // --- 新增：获取用户已做题 ID 列表用于排重 ---
   let doneQuestionIds = [];
   if (userId && userId !== 'test-user-id') {
@@ -65,11 +68,23 @@ exports.main = async (event, context) => {
   }
 
   try {
-    // 2. 确定要查询的集合
-    const targetCollection = collectionMap[type] || 'questions';
-
     // 3. 构建排重查询条件
     let query = db.collection(targetCollection).aggregate();
+    
+    // 如果是专项练习，映射字段确保返回的数据包含知识点
+    // 聚合管道：$project 确保字段名统一，特别是 _id 和知识点字段
+    query = query.project({
+      _id: 1,
+      content: 1,
+      options: 1,
+      answer: 1,
+      explanation: 1,
+      difficulty: 1,
+      knowledgePoint: '$knowledgePoints', // 数据库中是 knowledgePoints 数组，取第一个作为展示
+      skill: { $arrayElemAt: ['$skills', 0] },
+      type: type || '$type'
+    });
+
     if (doneQuestionIds.length > 0) {
       query = query.match({
         _id: db.command.nin(doneQuestionIds)
@@ -79,14 +94,40 @@ exports.main = async (event, context) => {
     // 4. 执行随机抽题
     let res = await query.sample({ size: limit }).end();
 
+    // 数据清洗逻辑：因为 aggregated 后的知识点可能是数组（根据 Schema），前端更新需要字符串
+    if (res.data) {
+      res.data = res.data.map(q => {
+        // 如果知识点是数组，取第一项，否则保留原值
+        let kp = q.knowledgePoint;
+        if (Array.isArray(kp)) kp = kp[0];
+        return {
+          ...q,
+          knowledgePoint: kp || '未分类'
+        };
+      });
+    }
+
     // 5. 兜底逻辑：如果该特定模块还没导入新题或已被做完，则从全库随机抽（不带排重，防止完全没题显）
     if (!res.data || res.data.length === 0) {
       const allRes = await db.collection('questions')
         .aggregate()
+        .project({
+          _id: 1, content: 1, options: 1, answer: 1, explanation: 1,
+          knowledgePoint: '$knowledgePoints',
+          type: 1
+        })
         .sample({ 
           size: limit 
         })
         .end()
+        
+      if (allRes.data) {
+        allRes.data = allRes.data.map(q => {
+          let kp = q.knowledgePoint;
+          if (Array.isArray(kp)) kp = kp[0];
+          return { ...q, knowledgePoint: kp || '未分类' };
+        });
+      }
         
       return {
         code: 0,

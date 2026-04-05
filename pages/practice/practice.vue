@@ -368,17 +368,44 @@ export default {
           modules: {}
         };
         
-        // --- 收集错题信息 ---
+        // --- 收集错题和知识点信息 ---
         const wrongQuestions = [];
+        const results = []; // 包含每题的正确性、知识点和技能
 
         this.questionQueue.forEach(q => {
           // 优先使用题目自带的 type，如果没有则使用当前模块的 type
-          const moduleKey = q.type || this.currentModuleType || 'unknown';
+          let moduleKey = q.type || this.currentModuleType || 'unknown';
+          
+          // 关键修正：确保中文模块名映射到英文 key，以便后端正确累加到 moduleStats.xxx
+          const typeMapping = {
+            '言语理解': 'verbal',
+            '数量关系': 'quantitative',
+            '判断推理': 'reasoning',
+            '资料分析': 'dataAnalysis',
+            '常识判断': 'commonSense',
+            '时政聚焦': 'politics',
+            '时政热点': 'politics'
+          };
+          
+          if (typeMapping[moduleKey]) {
+            moduleKey = typeMapping[moduleKey];
+          }
+
           if (!stats.modules[moduleKey]) stats.modules[moduleKey] = 0;
           stats.modules[moduleKey]++;
 
+          const isCorrect = q.userAnswer === q.correctAnswer;
+          
+          // 收集详细知识点统计
+          results.push({
+            id: q._id,
+            knowledgePoint: q.knowledgePoint || q.category || '未分类',
+            skill: q.skill || (q.knowledgePoint ? '综合分析' : '基础知识'),
+            isCorrect: isCorrect
+          });
+
           // 记录正确数
-          if (q.userAnswer === q.correctAnswer) {
+          if (isCorrect) {
             stats.totalCorrect++;
           } else if (q.userAnswer !== null) {
             // 记录错题
@@ -396,6 +423,7 @@ export default {
           data: {
             userId: userId,
             stats: stats,
+            results: results, // 传入逐题结果
             questionIds: this.questionQueue.map(q => q._id), // 新增：传题目ID列表用于排重
             wrongQuestions: wrongQuestions // 新增：传错题列表
           }

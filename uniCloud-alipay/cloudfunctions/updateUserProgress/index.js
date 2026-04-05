@@ -54,6 +54,32 @@ exports.main = async (event, context) => {
       }
     }
 
+    // --- 新增：粒度化知识点/技能追踪 ---
+    if (event.results && event.results.length > 0) {
+      for (const res of event.results) {
+        let { knowledgePoint, skill, isCorrect } = res;
+        
+        // 更新知识点正确率：使用 profile 字段存储
+        if (knowledgePoint) {
+           // 修正点1: 统一格式处理，防止 "主旨理解 " 和 "主旨理解" 被存为两个不同的 key
+           const kpName = String(knowledgePoint).trim().replace(/\./g, '_'); 
+           const kpKey = `profile.knowledgePoints.${kpName}`;
+           
+           updateData[`${kpKey}.total`] = dbCmd.inc(1);
+           if (isCorrect) {
+             updateData[`${kpKey}.correct`] = dbCmd.inc(1);
+           }
+        }
+        
+        // 更新技能分数 (0-100)
+        if (skill) {
+          const sName = String(skill).trim().replace(/\./g, '_');
+          const skillKey = `profile.skills.${sName}`;
+          updateData[skillKey] = dbCmd.inc(isCorrect ? 2 : -1);
+        }
+      }
+    }
+
     // --- 新增：记录已做题目 ID 列表，用于排重 ---
     if (event.questionIds && event.questionIds.length > 0) {
       updateData.doneQuestionIds = dbCmd.addToSet({

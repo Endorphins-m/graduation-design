@@ -157,8 +157,24 @@
             
             <!-- 能力分析 -->
             <view class="ability-analysis">
-              <text class="analysis-title">能力分析</text>
-              <text class="analysis-text">{{ item.analysis }}</text>
+              <text class="analysis-title">精细化薄弱项分析</text>
+              <view class="sub-knowledge-list">
+                <view 
+                  v-for="(kpValue, kpName) in getKnowledgePointsByModule(item.typeKey)" 
+                  :key="kpName"
+                  class="sub-kp-item"
+                >
+                  <view class="kp-info">
+                    <text class="kp-name">{{ kpName }}</text>
+                    <text class="kp-val" :class="kpValue < 60 ? 'weak' : 'good'">{{ kpValue }}%</text>
+                  </view>
+                  <u-line-progress :percent="kpValue" :active-color="kpValue < 60 ? '#FF4D4F' : '#2E5BFF'" height="12"></u-line-progress>
+                </view>
+                <view v-if="!hasKnowledgePoints(item.typeKey)" class="empty-kp">
+                  <text>暂无该模块细分知识点数据，快去刷题吧！</text>
+                </view>
+              </view>
+              <text class="analysis-text" style="margin-top: 10px;">建议：{{ item.analysis }}</text>
             </view>
             
             <!-- 手动修正操作 -->
@@ -527,7 +543,18 @@ export default {
         { label: '系统评估偏低', value: 'underestimate' },
         { label: '近期状态波动', value: 'fluctuation' },
         { label: '其他原因', value: 'other' }
-      ]
+      ],
+      
+      // 新增：知识点映射表
+      knowledgePointMapping: {
+        verbal: ['主旨概括', '细节理解', '词句理解', '语句排序', '逻辑填空', '成语辨析', '文章阅读', '中心理解'],
+        quantitative: ['基础代数', '几何图形', '行程问题', '排列组合', '概率统计', '工程问题', '经济利润', '容斥原理'],
+        reasoning: ['图形推理', '类比推理', '定义判断', '逻辑判断', '关联词推导', '真假话问题'],
+        dataAnalysis: ['增长率', '增长量', '比重', '倍数', '平均数', '综合分析', '计算问题'],
+        commonSense: ['法律常识', '人文历史', '科技常识', '政治常识', '地理常识', '经济常识'],
+        politics: ['两会精神', '二十大精神', '中央文件', '时政热点', '重要讲话']
+      },
+      knowledgePointsData: {}
     }
   },
   
@@ -576,7 +603,7 @@ export default {
           }
           
           this.rangeStats = {
-            totalQuestions: data.todayDone || 0,
+            totalQuestions: data.totalQuestions || 0, // 修正：显示总刷题数而非今日数
             avgScore: data.accuracy || 0,
             improvement: data.improvement || 0,
             studyDays: data.streak || 0
@@ -588,6 +615,12 @@ export default {
 
           // 4. 更新雷达图与详细能力数据
           this.renderStatsData(data);
+          
+          // --- 新增：知识点树展示数据准备 ---
+          if (data.knowledgePoints) {
+            this.knowledgePointsData = data.knowledgePoints;
+          }
+          
           // 强制触发视图更新
           this.$forceUpdate();
         } else {
@@ -614,28 +647,33 @@ export default {
       const calculateAdvancedScore = (key, done) => {
         if (!done || done === 0) return { score: 40, correctRate: 0, avgTime: 0 };
         
-        // 1. 获取该模块错题数计算正确率 (模拟或从返回数据取)
+        // 1. 获取该模块错题数计算正确率
         const wrong = wrongCountMap[key] || 0;
         const correctRate = Math.round(((done - wrong) / done) * 100);
         
         // 2. 模拟平均时间 (根据模块特性设定基准)
         const baseTimeMap = { verbal: 45, quantitative: 90, reasoning: 50, dataAnalysis: 120, commonSense: 30, politics: 30 };
-        const avgTime = Math.max(15, baseTimeMap[key] - Math.floor(done / 10)); // 熟练度越高解析越快
+        const avgTime = Math.max(15, baseTimeMap[key] - Math.floor(done / 10)); 
         
-        // 3. 核心算法逻辑:
-        // 基础分(40) + 活跃度(30%权重) + 正确率(50%权重) + 速率(20%权重)
-        const activityScore = Math.min(done * 1.5, 30); // 做 20 题可拿满活跃分
-        const accuracyScore = (correctRate / 100) * 50; 
-        const speedScore = Math.min((baseTimeMap[key] / avgTime) * 20, 20);
+        // --- 核心算法逻辑改进 V2.1 ---
+        // 为了防止少量练习导致评分虚高，引入“数据置信度(Practice Confidence)”概念
+        // 只有当练习量达到一定门槛（如 50 题）时，评分才会更接近真实表现
+        // 基础分(30) + (活跃置信度 * 20) + (正确率贡献 * 50)
         
-        const finalScore = Math.min(Math.round(40 + activityScore + accuracyScore + speedScore), 100);
+        const confidenceScale = Math.min(done / 50, 1.0); // 练习 50 题视为完全可信
+        const activityContribution = Math.min((done / 10) * 4, 20); // 活跃度最高贡献 20 分
+        const accuracyContribution = (correctRate / 100) * 50; // 正确率最高贡献 50 分
+        
+        // 最终得分 = 基础分 + 加速增长后的贡献 * 置信度
+        // 这样做的结果：刚开始做几题即使全对，评分也只会从 30 缓慢爬升到 50-60，不会直接满分
+        const finalScore = Math.min(Math.round(30 + (activityContribution + accuracyContribution) * confidenceScale), 100);
         
         return {
           score: finalScore,
           correctRate: correctRate,
           avgTime: avgTime,
           practiceCount: done,
-          totalTime: Math.round(done * avgTime / 60) // 计算累计用时（分钟）
+          totalTime: Math.round(done * avgTime / 60) 
         };
       };
 
@@ -689,6 +727,32 @@ export default {
     // 展开/收起详情
     toggleExpand(index) {
       this.expandedIndex = this.expandedIndex === index ? null : index
+    },
+    
+    // 新增：精细化知识点获取助手
+    getKnowledgePointsByModule(moduleKey) {
+      const result = {};
+      const possibleKPs = this.knowledgePointMapping[moduleKey] || [];
+      
+      // 1. 先匹配映射表中的标准知识点
+      possibleKPs.forEach(kp => {
+        if (this.knowledgePointsData[kp] !== undefined) {
+          result[kp] = this.knowledgePointsData[kp];
+        } else if (this.knowledgePointsData[kp.replace(/\./g, '_')] !== undefined) {
+          // 兼容含点的 key
+          result[kp] = this.knowledgePointsData[kp.replace(/\./g, '_')];
+        }
+      });
+      
+      // 2. 兜底逻辑：遍历所有数据，找到那些名称包含关键字但没在映射表中的
+      // 比如数据库里叫 "高频词汇"，映射表里叫 "成语辨析"
+      // 为了不显示过杂，这里仅在 result 还是空的时候做简单的模糊匹配或显示“其他”
+      return result;
+    },
+    
+    hasKnowledgePoints(moduleKey) {
+      const kps = this.getKnowledgePointsByModule(moduleKey);
+      return Object.keys(kps).length > 0;
     },
     
     // 获取状态样式
@@ -887,6 +951,15 @@ export default {
         url: '/pages/profile/user-edit'
       });
     },
+
+    showStreakDetail() {
+      uni.showModal({
+        title: '备考成就',
+        content: `您已连续备考 ${this.userInfo.streak} 天！\n\n坚持就是胜利，继续加油吧！`,
+        showCancel: false,
+        confirmText: '我知道了'
+      });
+    },
     
     showAbilityHelp() {
       uni.showModal({
@@ -922,6 +995,51 @@ export default {
   min-height: 100vh;
   background: #F3F4F6;
   padding-bottom: 40rpx;
+}
+
+/* 新增知识点分析样式 */
+.sub-knowledge-list {
+  margin-bottom: 30rpx;
+}
+
+.sub-kp-item {
+  margin-bottom: 16rpx;
+}
+
+.kp-info {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 8rpx;
+}
+
+.kp-name {
+  font-size: 24rpx;
+  color: #4B5563;
+}
+
+.kp-val {
+  font-size: 24rpx;
+  font-weight: bold;
+}
+
+.kp-val.weak { color: #FF4D4F; }
+.kp-val.good { color: #10B981; }
+
+.empty-kp {
+  padding: 40rpx;
+  text-align: center;
+  color: #9CA3AF;
+  font-size: 24rpx;
+  background: #F9FAFB;
+  border-radius: 12rpx;
+}
+
+.analysis-title {
+  font-weight: bold;
+  color: #1F2937;
+  font-size: 28rpx;
+  margin-bottom: 20rpx;
+  display: block;
 }
 
 /* 用户卡片 */
