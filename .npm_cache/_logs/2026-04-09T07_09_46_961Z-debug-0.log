@@ -1,0 +1,77 @@
+0 verbose cli E:\node.js\node.js2\node.exe E:\node.js\node.js2\node_modules\npm\bin\npm-cli.js
+1 info using npm@10.8.2
+2 info using node@v20.18.0
+3 silly config load:file:E:\node.js\node.js2\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\20173\AppData\Local\Microsoft\TypeScript\6.0\.npmrc
+5 silly config load:file:C:\Users\20173\.npmrc
+6 silly config load:file:E:\node.js\node.js2\node_global\etc\npmrc
+7 verbose title npm install @types/node@ts6.0
+8 verbose argv "install" "--ignore-scripts" "@types/node@ts6.0" "--save-dev" "--user-agent" "typesInstaller/6.0.2"
+9 verbose logfile logs-max:10 dir:C:\Users\20173\Desktop\graduation design\person\.npm_cache\_logs\2026-04-09T07_09_46_961Z-
+10 verbose logfile C:\Users\20173\Desktop\graduation design\person\.npm_cache\_logs\2026-04-09T07_09_46_961Z-debug-0.log
+11 silly packumentCache heap:2197815296 maxSize:549453824 maxEntrySize:274726912
+12 silly logfile start cleaning logs, removing 1 files
+13 silly packumentCache corgi:https://registry.npmmirror.com/@types%2fnode cache-miss
+14 silly logfile done cleaning log files
+15 http fetch GET 200 https://registry.npmmirror.com/@types%2fnode 315ms (cache updated)
+16 silly packumentCache corgi:https://registry.npmmirror.com/@types%2fnode set size:556274 disposed:false
+17 silly idealTree buildDeps
+18 silly fetch manifest @types/node@25.5.2
+19 silly packumentCache full:https://registry.npmmirror.com/@types%2fnode cache-miss
+20 http fetch GET 200 https://registry.npmmirror.com/@types%2fnode 262ms (cache updated)
+21 silly packumentCache full:https://registry.npmmirror.com/@types%2fnode set size:1151479 disposed:false
+22 silly placeDep ROOT @types/node@25.5.2 OK for:  want: 25.5.2
+23 silly fetch manifest undici-types@~7.18.0
+24 silly packumentCache full:https://registry.npmmirror.com/undici-types cache-miss
+25 http fetch GET 200 https://registry.npmmirror.com/undici-types 51ms (cache updated)
+26 silly packumentCache full:https://registry.npmmirror.com/undici-types set size:37886 disposed:false
+27 silly placeDep ROOT undici-types@7.18.2 OK for: @types/node@25.5.2 want: ~7.18.0
+28 silly reify moves {}
+29 silly audit bulk request {
+29 silly audit   '@types/react': [ '19.2.14' ],
+29 silly audit   csstype: [ '3.2.3' ],
+29 silly audit   'types-registry': [ '0.1.764' ],
+29 silly audit   '@types/node': [ '25.5.2' ],
+29 silly audit   'undici-types': [ '7.18.2' ]
+29 silly audit }
+30 silly tarball no local data for @types/node@https://registry.npmmirror.com/@types/node/-/node-25.5.2.tgz. Extracting by manifest.
+31 http fetch POST 404 https://registry.npmmirror.com/-/npm/v1/security/advisories/bulk 24ms
+32 silly audit bulk request failed [object Object]
+33 http fetch POST 404 https://registry.npmmirror.com/-/npm/v1/security/audits/quick 9ms
+34 verbose audit error HttpErrorGeneral: 404 Not Found - POST https://registry.npmmirror.com/-/npm/v1/security/audits/quick - [NOT_IMPLEMENTED] /-/npm/v1/security/* not implemented yet
+34 verbose audit error     at E:\node.js\node.js2\node_modules\npm\node_modules\npm-registry-fetch\lib\check-response.js:95:15
+34 verbose audit error     at process.processTicksAndRejections (node:internal/process/task_queues:95:5)
+34 verbose audit error     at async [getReport] (E:\node.js\node.js2\node_modules\npm\node_modules\@npmcli\arborist\lib\audit-report.js:336:21)
+34 verbose audit error     at async AuditReport.run (E:\node.js\node.js2\node_modules\npm\node_modules\@npmcli\arborist\lib\audit-report.js:106:19) {
+34 verbose audit error   headers: [Object: null prototype] {
+34 verbose audit error     server: [ 'Tengine' ],
+34 verbose audit error     date: [ 'Thu, 09 Apr 2026 07:09:48 GMT' ],
+34 verbose audit error     'content-type': [ 'application/json' ],
+34 verbose audit error     'transfer-encoding': [ 'chunked' ],
+34 verbose audit error     connection: [ 'keep-alive' ],
+34 verbose audit error     'strict-transport-security': [ 'max-age=5184000' ],
+34 verbose audit error     via: [ 'kunlun12.cn7728[,404666]' ],
+34 verbose audit error     'timing-allow-origin': [ '*' ],
+34 verbose audit error     eagleid: [ '7030a39417757185881151011e' ],
+34 verbose audit error     'x-fetch-attempts': [ '1' ]
+34 verbose audit error   },
+34 verbose audit error   statusCode: 404,
+34 verbose audit error   code: 'E404',
+34 verbose audit error   method: 'POST',
+34 verbose audit error   uri: 'https://registry.npmmirror.com/-/npm/v1/security/audits/quick',
+34 verbose audit error   body: {
+34 verbose audit error     error: '[NOT_IMPLEMENTED] /-/npm/v1/security/* not implemented yet'
+34 verbose audit error   },
+34 verbose audit error   pkgid: undefined
+34 verbose audit error }
+35 silly audit error [object Object]
+36 silly audit report null
+37 http fetch GET 200 https://cdn.npmmirror.com/packages/%40types/node/25.5.2/node-25.5.2.tgz 349ms (cache miss)
+38 silly ADD node_modules/undici-types
+39 silly ADD node_modules/@types/node
+40 verbose cwd C:\Users\20173\AppData\Local\Microsoft\TypeScript\6.0
+41 verbose os Windows_NT 10.0.26200
+42 verbose node v20.18.0
+43 verbose npm  v10.8.2
+44 verbose exit 0
+45 info ok

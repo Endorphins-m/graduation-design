@@ -189,7 +189,105 @@ export default {
   
   methods: {
     async loadSingleQuestion(id, mode) {
-      // ... 逻辑保持不变 ...
+      uni.showLoading({ title: '加载题目中...' });
+      try {
+        const db = uniCloud.database();
+        const collections = [
+          'verbal_questions', 'quantitative_questions', 'reasoning_questions', 
+          'data_analysis_questions', 'common_sense_questions', 'politics_questions'
+        ];
+        
+        let targetQuestion = null;
+        let realId = id;
+        let subId = null;
+
+        // 资料分析子题目 ID 处理: 格式支持 "prefix_index" 或 "material_xxx_index"
+        if (id.includes('_')) {
+          const parts = id.split('_');
+          subId = parts.pop(); // 弹出最后一部分作为 subId
+          realId = parts.join('_'); // 剩下的部分重新组合作为 realId
+        }
+
+        // 构建 ID 搜索数组，支持 String 和 Number (UniCloud 跨端兼容)
+        const idSearchArr = [realId];
+        if (/^\d+$/.test(realId)) idSearchArr.push(Number(realId));
+        if (typeof realId !== 'string') idSearchArr.push(String(realId));
+
+        for (const col of collections) {
+          try {
+            // 使用 where + in 代替 doc，兼容性更好
+            const res = await db.collection(col).where({
+              _id: db.command.in(idSearchArr)
+            }).get();
+
+            if (res.result.data && res.result.data.length > 0) {
+              const item = res.result.data[0];
+              
+              // 如果是复合题（资料分析）
+              if (item.questions && Array.isArray(item.questions)) {
+                // 如果有子题ID，找对应的子题（支持 qid, _id 或 index）
+                const subQ = subId ? 
+                  item.questions.find((q, idx) => String(q.qid) === subId || String(q._id) === subId || String(idx) === subId) : 
+                  item.questions[0];
+                if (subQ) {
+                  // 转换材料图片（复用 getRecommendQuestions 的逻辑思路）
+                  let materialHtml = '';
+                  if (item.material) {
+                    let img = item.material.image || '';
+                    // 简单处理：在这里我们假设直接显示，如果需要 cloud:// 转换建议在云函数处理
+                    // 但为了保证跳转可用，先合成 HTML
+                    materialHtml = `<div style="background:#f8f9fa;padding:12px;margin-bottom:12px;border-left:4px solid #2E5BFF;">
+                      <div style="font-weight:bold;color:#2E5BFF;margin-bottom:8px;">[阅读材料]</div>
+                      ${img ? `<img src="${img}" style="width:100%"/>` : ''}
+                      <div>${item.material.text || ''}</div>
+                    </div>`;
+                  }
+
+                  targetQuestion = {
+                    ...subQ,
+                    _id: id,
+                    content: materialHtml + subQ.content,
+                    source: item.source || '资料分析',
+                    correctAnswer: subQ.answer !== undefined ? subQ.answer : subQ.correctAnswer,
+                    analysis: subQ.explanation || subQ.analysis || '暂无解析',
+                    userAnswer: null
+                  };
+                }
+              } else {
+                // 普通题
+                targetQuestion = {
+                  ...item,
+                  correctAnswer: item.answer !== undefined ? item.answer : item.correctAnswer,
+                  analysis: item.explanation || item.analysis || '暂无解析',
+                  userAnswer: null
+                };
+              }
+              if (targetQuestion) break;
+            }
+          } catch (err) {
+            console.warn(`Query ${col} failed:`, err);
+          }
+        }
+
+        if (targetQuestion) {
+          this.questionQueue = [targetQuestion];
+          this.dailyLimit = 1;
+          this.currentIndex = 0;
+          this.startTime = Date.now();
+          if (mode === 'review') {
+            this.isSubmitted = true;
+          }
+          uni.hideLoading(); // 关键成功路径：提前关闭 loading，防止后续 checkIdCollected 延迟导致的冲突
+          this.checkIdCollected();
+        } else {
+          uni.hideLoading(); // 业务逻辑失败路径：关闭 loading
+          uni.showToast({ title: '未找到相关题目', icon: 'none' });
+        }
+      } catch (e) {
+        uni.hideLoading(); // 异常路径：关闭 loading
+        console.error('加载单题异常:', e);
+        uni.showToast({ title: '加载失败', icon: 'none' });
+      }
     },
 
     async loadMultiQuestions(ids, mode) {
@@ -259,8 +357,10 @@ export default {
         if (res.result && res.result.code === 0) {
           this.questionQueue = res.result.data.map(item => ({
             ...item,
-            // 关键修正：将数据库中的 answer 字段映射为组件使用的 correctAnswer 字段
+            // 关键修正：确保数据库字段与前端字段对齐
             correctAnswer: item.answer !== undefined ? item.answer : item.correctAnswer,
+            analysis: item.explanation || item.analysis || '暂无解析',
+            recommendedTime: item.recommendedTime || 0,
             userAnswer: null 
           }));
           this.dailyLimit = this.questionQueue.length;

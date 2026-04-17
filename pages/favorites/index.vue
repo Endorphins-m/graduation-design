@@ -42,14 +42,24 @@
 					<text class="time">{{ formatDate(item.updateTime) }}</text>
 				</view>
 				<view class="item-content">
-					<text class="question-text u-line-2">{{ item.questionData[0].content }}</text>
+					<text class="question-text u-line-2">{{ (item.questionData && item.questionData[0]) ? (item.questionData[0].content || '无题干内容') : '题目已下架' }}</text>
 				</view>
 				<view class="item-footer">
 					<view class="action-info">
-						<u-icon name="star-fill" size="28" color="#FAAD14"></u-icon>
-						<text class="action-text">已收藏</text>
+						<u-icon name="clock" size="24" color="#94A3B8"></u-icon>
+						<text class="time-text">{{ formatDate(item.updateTime) }}</text>
 					</view>
-					<u-button size="mini" type="error" plain @click.stop="removeCollection(item)">取消收藏</u-button>
+					
+					<view class="btn-group">
+						<view class="delete-btn" @click.native.stop="removeCollection(item)">
+							<u-icon name="trash" size="28" color="#FF4D4F"></u-icon>
+							<text class="del-text">移除</text>
+						</view>
+						<view class="go-btn">
+							<text>进入练习</text>
+							<u-icon name="arrow-right" size="20" color="#FAAD14"></u-icon>
+						</view>
+					</view>
 				</view>
 			</view>
 			
@@ -162,12 +172,28 @@ export default {
 				success: async (res) => {
 					if (res.confirm) {
 						try {
-							const db = uniCloud.database();
-							await db.collection('collection_records').doc(item._id).remove();
-							uni.showToast({ title: '已取消收藏', icon: 'success' });
-							this.refreshList();
-							this.getStats();
+							// 修复参数：云函数 toggleCollection 使用 action: 'toggle' 而不是 isCollect: false
+							const { result } = await uniCloud.callFunction({
+								name: 'toggleCollection',
+								data: {
+									userId: this.userId,
+									questionId: item.questionId,
+									moduleType: item.moduleType,
+									action: 'toggle' // 确认改为该云函数支持的 toggle 操作
+								}
+							});
+							
+							if (result.code === 0) {
+								uni.showToast({ title: '已取消收藏', icon: 'success' });
+								setTimeout(() => {
+									this.refreshList();
+									this.getStats();
+								}, 300);
+							} else {
+								throw new Error(result.message);
+							}
 						} catch (e) {
+							console.error('取消收藏失败', e);
 							uni.showToast({ title: '操作失败', icon: 'none' });
 						}
 					}
@@ -243,6 +269,76 @@ export default {
 	padding: 30rpx;
 	margin-bottom: 24rpx;
 	box-shadow: 0 4rpx 12rpx rgba(0,0,0,0.05);
+}
+
+.collection-item {
+	transition: all 0.3s;
+	&:active {
+		transform: scale(0.98);
+	}
+}
+
+.item-footer {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	margin-top: 24rpx;
+	padding-top: 20rpx;
+	border-top: 1rpx solid #F1F5F9;
+	
+	.action-info {
+		display: flex;
+		align-items: center;
+		.time-text {
+			font-size: 24rpx;
+			color: #94A3B8;
+			margin-left: 8rpx;
+		}
+	}
+	
+	.btn-group {
+		display: flex;
+		align-items: center;
+		gap: 20rpx;
+		
+		.delete-btn {
+			display: flex;
+			align-items: center;
+			padding: 10rpx 20rpx;
+			background-color: #FFF1F0;
+			border-radius: 30rpx;
+			transition: all 0.2s;
+			
+			.del-text {
+				font-size: 24rpx;
+				color: #FF4D4F;
+				margin-left: 4rpx;
+			}
+			
+			&:active {
+				background-color: #FFCCC7;
+			}
+		}
+		
+		.go-btn {
+			display: flex;
+			align-items: center;
+			padding: 10rpx 24rpx;
+			background-color: #FFFBE6;
+			border-radius: 30rpx;
+			font-size: 24rpx;
+			color: #FAAD14;
+			font-weight: 500;
+			
+			u-icon {
+				margin-left: 4rpx;
+			}
+			
+			&:active {
+				background-color: #FFF1B8;
+			}
+		}
+	}
 }
 
 .collection-item {

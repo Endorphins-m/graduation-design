@@ -89,20 +89,20 @@
       {
         "pagePath": "pages/plan/plan",
         "text": "计划",
-        "iconPath": "static/tabbar/plan.png",
-        "selectedIconPath": "static/tabbar/plan-active.png"
+        "iconPath": "https://img.icons8.com/material-outlined/48/999999/calendar.png",
+        "selectedIconPath": "https://img.icons8.com/material/48/2E5BFF/calendar.png"
       },
       {
         "pagePath": "pages/library/library",
         "text": "刷题",
-        "iconPath": "static/tabbar/practice.png",
-        "selectedIconPath": "static/tabbar/practice-active.png"
+        "iconPath": "https://img.icons8.com/material-outlined/48/999999/edit-property.png",
+        "selectedIconPath": "https://img.icons8.com/material/48/2E5BFF/edit-property.png"
       },
       {
         "pagePath": "pages/profile/profile",
         "text": "我的",
-        "iconPath": "static/tabbar/profile.png",
-        "selectedIconPath": "static/tabbar/profile-active.png"
+        "iconPath": "https://img.icons8.com/material-outlined/48/999999/user-male-circle.png",
+        "selectedIconPath": "https://img.icons8.com/material/48/2E5BFF/user-male-circle.png"
       }
     ],
     "selectedColor": "#2E5BFF",

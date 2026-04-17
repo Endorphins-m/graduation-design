@@ -70,6 +70,19 @@ exports.main = async (event, context) => {
     // 计算平均时长：总小时 * 60 / 累计天数 = 平均分钟数
     const realAvgTime = Math.round((totalStudyHours * 60) / totalStreak)
 
+    const abilityTrends = modules.map(m => {
+      let trend = 'stable';
+      if (m.score >= 85) trend = 'up';
+      else if (m.score >= 60) trend = 'stable';
+      else trend = 'accumulate';
+      
+      return {
+        name: m.name,
+        score: Math.round(m.score),
+        trend: trend
+      }
+    })
+
     return {
       code: 0,
       data: {
@@ -82,27 +95,92 @@ exports.main = async (event, context) => {
         currentDay: getDayOfYearProgress(),
         today: (now.getMonth() + 1) + '月' + now.getDate() + '日',
         todayTasks: todayTasks,
-        abilityTrends: modules.map(m => {
-          let trend = 'stable';
-          // 逻辑重新设计：
-          // >= 85: 突破 (up)
-          // 60-85: 稳健 (stable)
-          // < 60: 筑基 (accumulate)
-          if (m.score >= 85) trend = 'up';
-          else if (m.score >= 60) trend = 'stable';
-          else trend = 'accumulate';
-          
-          return {
-            name: m.name,
-            score: Math.round(m.score),
-            trend: trend
-          }
-        })
+        abilityTrends: abilityTrends,
+        // 5. 生成本周 7 天的动态推荐计划 (算法推荐)
+        mockWeeklyPlan: generateWeeklyPlan(modules, dailyLimit)
       }
     }
   } catch (e) {
     return { code: -1, message: '生成计划失败: ' + e.message }
   }
+}
+
+/**
+ * 核心推荐算法：基于用户五大模块分值的“智能削峰填谷”计划
+ * 逻辑：
+ * 1. 周一周二：重点突击分数最低的 2 个模块（筑基/突破）
+ * 2. 周三周日：模拟考/总结（综合评估）
+ * 3. 周四周五：均衡提升/资料专项
+ * 4. 题量分配：根据分数低（耗时多）还是高（效率高）分配题量
+ */
+function generateWeeklyPlan(modules, dailyLimit) {
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  const titles = [
+    '周一 · 基础稳固', '周二 · 弱项突破', '周三 · 模拟实战', 
+    '周四 · 资料专项', '周五 · 常识归纳', '周六 · 查漏补缺', '周日 · 总结预选'
+  ];
+  
+  // 按分数排序：0 为最弱，4 为最强
+  const weakest = modules[0];
+  const secondWeak = modules[1];
+  const strongest = modules[4];
+  
+  return days.map((day, index) => {
+    let focus = [];
+    let time = 60;
+    let questions = dailyLimit;
+    let desc = '';
+
+    switch(index) {
+      case 0: // 周一
+        focus = [{label: weakest.name, type: 'weak'}, {label: '基础扫盲', type: 'base'}];
+        time = Math.round(dailyLimit * 2.0); // 刚开始磨刀，用时设长点
+        desc = `侧重${weakest.name}的底层逻辑梳理`;
+        break;
+      case 1: // 周二
+        focus = [{label: secondWeak.name, type: 'weak'}, {label: weakest.name, type: 'weak'}];
+        time = Math.round(dailyLimit * 1.8);
+        desc = `深度攻克${weakest.name}和${secondWeak.name}的高频错题`;
+        break;
+      case 2: // 周三
+        focus = [{label: '全模块模拟', type: 'all'}];
+        questions = dailyLimit + 20; // 模拟日题量略多
+        time = 120;
+        desc = '由于处于模拟实战日，建议进行计时套题练习';
+        break;
+      case 3: // 周四
+        focus = [{label: '资料分析', type: 'strong'}, {label: '速度提升', type: 'base'}];
+        questions = Math.round(dailyLimit * 1.2);
+        time = 75;
+        desc = '侧重提升资料分析的运算精度与速度';
+        break;
+      case 4: // 周五
+        focus = [{label: '常识归纳', type: 'base'}, {label: '时政热点', type: 'base'}];
+        time = 50;
+        desc = '复盘本周错题，并归纳最新时政考点';
+        break;
+      case 5: // 周六
+        focus = [{label: '全量错题', type: 'weak'}, {label: '薄弱点复查', type: 'weak'}];
+        time = 90;
+        desc = '通过“错题本”进行针对性死穴扫描';
+        break;
+      case 6: // 周日
+        focus = [{label: '能力评估', type: 'all'}];
+        questions = Math.round(dailyLimit * 0.5); // 周日作为复盘日，题量减半
+        time = 40;
+        desc = '生成本周学习报告，智能预测下周学习权重';
+        break;
+    }
+
+    return {
+      day,
+      title: titles[index],
+      time,
+      totalQuestions: questions,
+      focus,
+      desc
+    }
+  });
 }
 
 function getWeekRange() {

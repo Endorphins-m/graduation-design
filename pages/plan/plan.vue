@@ -186,32 +186,77 @@
     
     <!-- 底部操作 -->
     <view class="footer-actions">
-      <button class="btn-outline" @click="viewFullPlan">
+      <view class="btn-outline" @tap="viewFullPlan" style="flex: 1; height: 80rpx; line-height: 80rpx; background: #ffffff; border: 2rpx solid #2E5BFF; color: #2E5BFF; border-radius: 40rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; gap: 12rpx;">
         <u-icon name="file-text" size="28" color="#2E5BFF"></u-icon>
-        查看完整计划
-      </button>
-      <button class="btn-outline" @click="adjustPreference">
+        <text>查看完整计划</text>
+      </view>
+      <view class="btn-outline" @tap="adjustPreference" style="flex: 1; height: 80rpx; line-height: 80rpx; background: #ffffff; border: 2rpx solid #2E5BFF; color: #2E5BFF; border-radius: 40rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; gap: 12rpx;">
         <u-icon name="setting" size="28" color="#2E5BFF"></u-icon>
-        调整偏好
-      </button>
+        <text>调整偏好</text>
+      </view>
     </view>
 
-    <!-- 将选择器移至根容器底部，确保不被嵌套样式干扰 -->
-    <u-picker 
-      v-model="showDatePicker" 
-      mode="time" 
-      :params="{
-        year: true,
-        month: true,
-        day: true,
-        hour: false,
-        minute: false,
-        second: false
-      }"
-      @confirm="onDateConfirm"
-      @cancel="showDatePicker = false"
-      title="选择考试日期"
-    ></u-picker>
+    <!-- 完整计划弹窗 -->
+    <view v-if="showFullPlanPopup" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; display: flex; flex-direction: column; justify-content: flex-end;">
+      <view class="full-plan-popup" style="height: 85vh; background: #F8FAFC; border-radius: 40rpx 40rpx 0 0; display: flex; flex-direction: column; overflow: hidden;">
+        <view class="popup-header" style="padding: 30rpx 40rpx; display: flex; justify-content: space-between; align-items: center; background: #ffffff; border-bottom: 1rpx solid #E2E8F0;">
+          <text class="popup-title" style="font-size: 34rpx; font-weight: 800; color: #1E293B;">本周智能计划</text>
+          <view @tap="showFullPlanPopup = false" style="padding: 20rpx;">
+            <u-icon name="close" size="36" color="#9CA3AF"></u-icon>
+          </view>
+        </view>
+        
+        <view style="flex: 1; overflow: hidden; display: flex; flex-direction: column;">
+          <scroll-view scroll-y="true" style="height: calc(85vh - 280rpx); padding: 30rpx; box-sizing: border-box; flex: 1;">
+            <view class="plan-summary-card">
+              <view class="summary-item">
+                <text class="val">1,250</text>
+                <text class="lab">预计题量</text>
+              </view>
+            <view class="summary-divider"></view>
+            <view class="summary-item">
+              <text class="val">12.5h</text>
+              <text class="lab">建议工时</text>
+            </view>
+            <view class="summary-divider"></view>
+            <view class="summary-item">
+              <text class="val">85%</text>
+              <text class="lab">目标正确率</text>
+            </view>
+          </view>
+
+          <view class="weekly-timeline">
+            <view v-for="(day, index) in mockWeeklyPlan" :key="index" class="timeline-item" :class="{ 'is-active': index === currentDay - 1 }">
+              <view class="time-node">
+                <text class="node-day">{{ day.day }}</text>
+                <view class="node-dot"></view>
+                <view class="node-line" v-if="index < mockWeeklyPlan.length - 1"></view>
+              </view>
+              <view class="node-content">
+                <view class="node-header">
+                  <text class="node-title">{{ day.title }}</text>
+                  <view class="node-meta">
+                    <text class="meta-tag">📝 {{ day.totalQuestions }}题</text>
+                    <text class="meta-tag">⏳ {{ day.time }}min</text>
+                  </view>
+                </view>
+                <view class="node-focus">
+                  <view v-for="(tag, tIdx) in day.focus" :key="tIdx" class="focus-tag" :class="tag.type">
+                    {{ tag.label }}
+                  </view>
+                </view>
+                <text class="node-desc">{{ day.desc }}</text>
+              </view>
+            </view>
+          </view>
+        </scroll-view>
+      </view>
+        
+        <view class="popup-footer" style="padding: 30rpx 40rpx; padding-bottom: calc(30rpx + constant(safe-area-inset-bottom)); padding-bottom: calc(30rpx + env(safe-area-inset-bottom)); background: #ffffff; border-top: 1rpx solid #E2E8F0; z-index: 10001;">
+          <button class="btn-confirm" @tap="showFullPlanPopup = false" style="width: 100%; height: 90rpx; line-height: 90rpx; background: #2E5BFF; color: #ffffff; border-radius: 45rpx; font-weight: 700; font-size: 32rpx; display: flex; align-items: center; justify-content: center; border: none;">了解计划，开始备考</button>
+        </view>
+      </view>
+    </view>
   </view>
 </template>
 
@@ -273,6 +318,18 @@ export default {
         { name: '判断推理', score: 58, trend: 'down' },
         { name: '资料分析', score: 52, trend: 'up' },
         { name: '常识判断', score: 60, trend: 'stable' }
+      ],
+      
+      // 完整计划弹窗状态
+      showFullPlanPopup: false,
+      mockWeeklyPlan: [
+        { day: 'Mon', title: '周一 · 基础稳固', time: 60, totalQuestions: 40, focus: [{label: '言语基础', type: 'base'}, {label: '数量初解', type: 'weak'}], desc: '侧重言语理解的规律总结' },
+        { day: 'Tue', title: '周二 · 弱项突破', time: 90, totalQuestions: 60, focus: [{label: '数量关系', type: 'weak'}, {label: '判断推理', type: 'base'}], desc: '深挖数量关系错题集' },
+        { day: 'Wed', title: '周三 · 模拟实战', time: 120, totalQuestions: 100, focus: [{label: '全模块', type: 'all'}], desc: '进行一次计时套题演练' },
+        { day: 'Thu', title: '周四 · 资料专项', time: 75, totalQuestions: 50, focus: [{label: '资料分析', type: 'strong'}], desc: '拔高资料分析计算速度' },
+        { day: 'Fri', title: '周五 · 常识归纳', time: 50, totalQuestions: 30, focus: [{label: '常识判断', type: 'base'}], desc: '梳理本周时政热点' },
+        { day: 'Sat', title: '周六 · 查漏补缺', time: 80, totalQuestions: 45, focus: [{label: '错题整理', type: 'weak'}], desc: '复盘本周所有错误考点' },
+        { day: 'Sun', title: '周日 · 总结预选', time: 40, totalQuestions: 20, focus: [{label: '能力评估', type: 'all'}], desc: '更新下周个性化学习权重' }
       ]
     }
   },
@@ -422,6 +479,11 @@ export default {
           
           // 3. 同步能力趋势
           this.abilityTrends = data.abilityTrends;
+
+          // 4. 同步本周完整计划
+          if (data.mockWeeklyPlan) {
+            this.mockWeeklyPlan = data.mockWeeklyPlan;
+          }
         } else {
           uni.showToast({ title: result.message || '加载失败', icon: 'none' });
         }
@@ -472,7 +534,9 @@ export default {
     },
     
     viewFullPlan() {
-      uni.navigateTo({ url: '/pages/plan/full-plan' })
+      console.log('点击查看完整计划');
+      this.showFullPlanPopup = true;
+      this.$forceUpdate();
     },
     
     getTrendIcon(trend) {
@@ -938,6 +1002,187 @@ export default {
     align-items: center;
     justify-content: center;
     gap: 12rpx;
+  }
+}
+
+/* 弹窗详细样式 */
+.full-plan-popup {
+  background: #F8FAFC;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+
+  .popup-header {
+    padding: 30rpx 40rpx;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
+    border-radius: 40rpx 40rpx 0 0;
+    
+    .popup-title {
+      font-size: 34rpx;
+      font-weight: 800;
+      color: #1E293B;
+    }
+  }
+
+  .popup-content {
+    flex: 1;
+    padding: 30rpx;
+    box-sizing: border-box;
+    overflow-y: auto;
+  }
+
+  .plan-summary-card {
+    display: flex;
+    justify-content: space-around;
+    padding: 30rpx;
+    background: linear-gradient(135deg, #2E5BFF 0%, #1E90FF 100%);
+    border-radius: 20rpx;
+    color: #ffffff;
+    margin-bottom: 40rpx;
+    box-shadow: 0 10rpx 20rpx rgba(46, 91, 255, 0.2);
+
+    .summary-item {
+      text-align: center;
+      .val {
+        display: block;
+        font-size: 36rpx;
+        font-weight: 700;
+        margin-bottom: 4rpx;
+      }
+      .lab {
+        font-size: 22rpx;
+        opacity: 0.8;
+      }
+    }
+    .summary-divider {
+      width: 1rpx;
+      height: 60rpx;
+      background: rgba(255, 255, 255, 0.3);
+      align-self: center;
+    }
+  }
+
+  .weekly-timeline {
+    .timeline-item {
+      display: flex;
+      gap: 30rpx;
+      margin-bottom: 30rpx;
+      
+      &.is-active {
+        .time-node .node-dot {
+          background: #2E5BFF;
+          box-shadow: 0 0 15rpx rgba(46, 91, 255, 0.8);
+        }
+        .node-content {
+          border: 2rpx solid #2E5BFF;
+          background: #EEF2FF;
+        }
+      }
+    }
+
+    .time-node {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      width: 80rpx;
+      position: relative;
+      
+      .node-day {
+        font-size: 24rpx;
+        font-weight: 700;
+        color: #94A3B8;
+        margin-bottom: 15rpx;
+      }
+      .node-dot {
+        width: 20rpx;
+        height: 20rpx;
+        border-radius: 50%;
+        background: #E2E8F0;
+        border: 4rpx solid #ffffff;
+        z-index: 2;
+      }
+      .node-line {
+        position: absolute;
+        top: 60rpx;
+        bottom: -30rpx;
+        width: 4rpx;
+        background: #E2E8F0;
+        z-index: 1;
+      }
+    }
+
+    .node-content {
+      flex: 1;
+      background: #ffffff;
+      padding: 24rpx;
+      border-radius: 20rpx;
+      box-shadow: 0 4rpx 12rpx rgba(0, 0, 0, 0.03);
+      
+        .node-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 12rpx;
+          .node-title {
+            font-size: 30rpx;
+            font-weight: 700;
+            color: #334155;
+          }
+          .node-meta {
+            display: flex;
+            gap: 12rpx;
+            .meta-tag {
+              font-size: 22rpx;
+              color: #64748B;
+              background: #F8FAFC;
+              padding: 2rpx 10rpx;
+              border-radius: 6rpx;
+            }
+          }
+        }
+
+      .node-focus {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10rpx;
+        margin-bottom: 12rpx;
+        .focus-tag {
+          font-size: 20rpx;
+          padding: 4rpx 12rpx;
+          border-radius: 8rpx;
+          background: #F1F5F9;
+          &.weak { color: #FF4D4F; background: #FFF1F0; }
+          &.base { color: #FAAD14; background: #FFFBE6; }
+          &.strong { color: #52C41A; background: #F6FFED; }
+          &.all { color: #2E5BFF; background: #EEF2FF; }
+        }
+      }
+      .node-desc {
+        font-size: 24rpx;
+        color: #94A3B8;
+      }
+    }
+  }
+
+  .popup-footer {
+    padding: 30rpx 40rpx;
+    background: #ffffff;
+    .btn-confirm {
+      width: 100%;
+      height: 90rpx;
+      line-height: 90rpx;
+      background: #2E5BFF !important;
+      color: #ffffff !important;
+      border-radius: 45rpx;
+      font-weight: 700;
+      font-size: 32rpx;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
   }
 }
 </style>

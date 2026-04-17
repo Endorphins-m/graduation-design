@@ -49,38 +49,148 @@ exports.main = async (event, context) => {
 			'判断推理': 'reasoning_questions',
 			'资料分析': 'data_analysis_questions',
 			'常识判断': 'common_sense_questions',
-			'时政热点': 'politics_questions'
+			'时政热点': 'politics_questions',
+			'政治理解': 'politics_questions',
+			'时事政治': 'politics_questions',
+			'政治': 'politics_questions'
 		};
+
+		// 所有可能包含题目的集合列表，用于回退搜索
+		const allCollections = [
+			'verbal_questions',
+			'quantitative_questions',
+			'reasoning_questions',
+			'data_analysis_questions',
+			'common_sense_questions',
+			'politics_questions',
+			'questions'
+		];
 
 		// 按集合分组 ids
 		const fetchGroups = {};
 		listRes.data.forEach(item => {
-			const collectionName = moduleToCollection[item.moduleType] || 'questions';
+			let collectionName = moduleToCollection[item.moduleType];
+			
+			// 如果 moduleType 无法匹配，或者 moduleType 本身就是 'questions' 或未定义
+			if (!collectionName) {
+				collectionName = 'unknown'; // 标记为未知，后续特殊处理
+			}
+			
 			if (!fetchGroups[collectionName]) fetchGroups[collectionName] = [];
 			fetchGroups[collectionName].push(item.questionId);
 		});
 
-		// 并行查询所有相关的题目表
+		// 存储最终查询到的题目映射
 		const qMap = {};
-		const fetchPromises = Object.keys(fetchGroups).map(async (col) => {
+
+		// 处理已知集合的查询
+		const knownCollections = Object.keys(fetchGroups).filter(c => c !== 'unknown');
+		const fetchPromises = knownCollections.map(async (col) => {
+			await fetchFromCollection(col, fetchGroups[col]);
+		});
+		await Promise.all(fetchPromises);
+
+		// 处理未知集合或之前未找到的题目（回退搜索）
+		const missedIds = [];
+		listRes.data.forEach(item => {
+			if (!qMap[item.questionId] && !qMap[String(item.questionId)]) {
+				missedIds.push(item.questionId);
+			}
+		});
+
+		if (missedIds.length > 0) {
+			// 对每一个未找到的 ID，在所有集合中尝试查找
+			// 为提升性能，按集合遍历
+			for (const col of allCollections) {
+				const currentMissed = missedIds.filter(id => !qMap[id] && !qMap[String(id)]);
+				if (currentMissed.length === 0) break;
+				await fetchFromCollection(col, currentMissed);
+			}
+		}
+
+		async function fetchFromCollection(col, rawIds) {
 			try {
+				// 获取去重后的真实父 ID
+				const parentIds = rawIds.map(id => {
+					const idStr = String(id);
+					// 处理格式如: material_49_2024_sichuan_5 -> material_49_2024_sichuan
+					if (idStr.includes('_')) {
+						const parts = idStr.split('_');
+						parts.pop(); // 移除最后一个子题索引
+						return parts.join('_');
+					}
+					return id;
+				});
+
+				// 构建查询列表
+				const searchIds = [];
+				parentIds.forEach(id => {
+					searchIds.push(id);
+					const idStr = String(id);
+					if (/^\d+$/.test(idStr)) searchIds.push(Number(idStr));
+					searchIds.push(idStr);
+				});
+				const uniqueSearchIds = Array.from(new Set(searchIds));
+
 				const qRes = await db.collection(col).where({
-					_id: db.command.in(fetchGroups[col])
+					_id: db.command.in(uniqueSearchIds)
 				}).get();
-				qRes.data.forEach(q => {
-					qMap[q._id] = q;
+
+				qRes.data.forEach(item => {
+					const itemIdStr = String(item._id);
+					const standardizedItem = {
+						...item,
+						content: item.content || '无题干内容',
+						correctAnswer: item.correctAnswer !== undefined ? item.correctAnswer : (item.answer !== undefined ? item.answer : 0)
+					};
+					
+					rawIds.forEach(originalId => {
+						const origIdStr = String(originalId);
+						// 匹配逻辑：ID完全相等 或 originalId 是以 itemIdStr + '_' 开头
+						if (origIdStr === itemIdStr || origIdStr.startsWith(itemIdStr + '_')) {
+							if (origIdStr.includes('_')) {
+								// 提取最后一个下划线后的内容作为子题 ID
+								const parts = origIdStr.split('_');
+								const subId = parts[parts.length - 1]; 
+								
+								if (item.questions && Array.isArray(item.questions)) {
+									const subQ = item.questions.find((q, idx) => 
+										String(idx) === subId || String(q.qid) === subId || String(q._id) === subId
+									);
+									if (subQ) {
+										qMap[originalId] = {
+											...subQ,
+											_id: originalId,
+											content: `[${item.source || '资料分析'}] ${subQ.content || ''}`,
+											correctAnswer: subQ.correctAnswer !== undefined ? subQ.correctAnswer : (subQ.answer !== undefined ? subQ.answer : 0),
+											isComposite: true,
+											parentMaterial: item.content || item.material
+										};
+									}
+								}
+							} else {
+								qMap[originalId] = standardizedItem;
+							}
+						}
+					});
 				});
 			} catch (err) {
 				console.error(`查询集合 ${col} 失败:`, err);
 			}
-		});
-		await Promise.all(fetchPromises);
+		}
 		
 		// 2.3 组装数据
-		const combinedData = listRes.data.map(item => ({
-			...item,
-			questionData: [qMap[item.questionId] || { content: '题目内容已失效或表名错误' }]
-		}))
+		const combinedData = listRes.data.map(item => {
+			// 尝试通过原始类型和强制转后的 String 类型去找
+			const qInfo = qMap[item.questionId] || qMap[String(item.questionId)];
+			if (!qInfo) {
+				console.warn(`未匹配到题目详情: ID=${item.questionId}, moduleType=${item.moduleType}`);
+			}
+			return {
+				...item,
+				questionData: [qInfo || { content: '题目内容已失效或表名错误', _id: item.questionId }]
+			};
+		})
 
 		const countTotal = await db.collection('collection_records').where(query).count()
 
