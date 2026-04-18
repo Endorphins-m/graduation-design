@@ -64,8 +64,11 @@ exports.main = async (event, context) => {
     '判断推理': 'reasoning',
     '资料分析': 'dataAnalysis',
     '常识判断': 'commonSense',
+    '政治理论': 'politics',
     '政治理解': 'politics',
-    '时事政治': 'politics'
+    '时事政治': 'politics',
+    '时政聚焦': 'politics',
+    '时政热点': 'politics'
   };
   if (reverseMap[queryModule]) {
     queryModule = reverseMap[queryModule];

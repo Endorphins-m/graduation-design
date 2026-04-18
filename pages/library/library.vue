@@ -69,7 +69,7 @@ export default {
         { name: '判断推理', value: 'reasoning', icon: 'eye', color: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)', done: 0 },
         { name: '资料分析', value: 'dataAnalysis', icon: 'order', color: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)', done: 0 },
         { name: '常识判断', value: 'commonSense', icon: 'info-circle', color: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', done: 0 },
-        { name: '政治理解', value: 'politics', icon: 'bookmark', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', done: 0 }
+        { name: '政治理论', value: 'politics', icon: 'bookmark', color: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)', done: 0 }
       ]
     }
   },
@@ -121,11 +121,11 @@ export default {
           this.todayDone = Number(stats.todayDone) || 0;
           this.dailyTarget = Number(stats.dailyTarget) || 50;
           
-          if (stats.moduleStats) {
-            // 对数组内部对象进行响应式更新
+          // --- 核心修正：直接使用后端计算好的真实总题数 ---
+          if (stats.moduleTotalStats) {
             this.modules.forEach((m, index) => {
-              const doneCount = stats.moduleStats[m.value] || 0;
-              this.$set(this.modules[index], 'done', doneCount);
+              const realDone = stats.moduleTotalStats[m.value] || 0;
+              this.$set(this.modules[index], 'done', realDone);
             });
           }
           console.log('【LIBRARY】数据同步成功:', this.todayDone, '/', this.dailyTarget);

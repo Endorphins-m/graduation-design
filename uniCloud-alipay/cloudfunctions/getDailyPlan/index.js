@@ -17,8 +17,10 @@ exports.main = async (event, context) => {
     const user = userRes.data[0]
     const moduleStats = user.moduleStats || {}
     
-    // 2. 这里的核心逻辑：根据能力强弱分配任务比例
-    // 我们按照 60% (薄弱题) / 30% (基础题) / 10% (拔高题) 的科学备考比例
+    const dailyLimit = 30; // 固定题量，移除了偏好设置依赖
+    
+    // 2. 这里的核心逻辑：根据用户能力画像分配任务比例
+    // 我们按照 60% (薄弱题) / 30% (基础题) / 10% (拔高题) 的比例
     
     // 排序找出最薄弱和最强的模块
     const modules = [
@@ -29,7 +31,6 @@ exports.main = async (event, context) => {
       { key: 'commonSense', name: '常识判断', score: moduleStats.commonSense || 0 }
     ].sort((a, b) => a.score - b.score)
 
-    const dailyLimit = user.learningPrefs?.dailyLimit || 30
     const now = new Date()
     const todayStr = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate()
 
@@ -41,7 +42,7 @@ exports.main = async (event, context) => {
         typeKey: modules[0].key,
         total: Math.round(dailyLimit * 0.6),
         completed: user.lastPracticeDate === todayStr ? (user.moduleStatsToday?.[modules[0].key] || 0) : 0,
-        estimatedTime: Math.round(dailyLimit * 0.6 * 1.5), // 假设薄弱题用时较长
+        estimatedTime: Math.round(dailyLimit * 0.6 * 1.5),
         priority: '高'
       },
       {
@@ -65,10 +66,32 @@ exports.main = async (event, context) => {
     ]
 
     // 4. 获取本周概览数据 (计算实时指标)
-    const totalStudyHours = user.studyHours || 0
-    const totalStreak = user.streak || 1
-    // 计算平均时长：总小时 * 60 / 累计天数 = 平均分钟数
-    const realAvgTime = Math.round((totalStudyHours * 60) / totalStreak)
+    const nowTimestamp = Date.now();
+    const oneDayMs = 24 * 60 * 60 * 1000;
+    const currentDayOfWeek = now.getDay() || 7; // 1-7 (周一到周日)
+    const mondayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime() - (currentDayOfWeek - 1) * oneDayMs;
+
+    // 从练习记录中统计本周累计时长（精确到分钟）
+    const practiceStats = await db.collection('practice_records')
+      .where({
+        userId,
+        createTime: dbCmd.gte(mondayStart)
+      })
+      .get();
+    
+    let weeklyTotalTime = 0;
+    let weeklyCompleted = 0;
+    let weeklyCorrect = 0;
+    
+    practiceStats.data.forEach(p => {
+      weeklyTotalTime += (p.duration || 0); // 假设存的是秒
+      weeklyCompleted += (p.totalQuestions || 0);
+      weeklyCorrect += (p.correctQuestions || 0);
+    });
+
+    // 计算本周日均时长：本周总秒数 / 60 / 本周已过天数
+    const realAvgTime = Math.round((weeklyTotalTime / 60) / currentDayOfWeek);
+    const weeklyAccuracy = weeklyCompleted > 0 ? Math.round((weeklyCorrect / weeklyCompleted) * 100) : (user.accuracy || 0);
 
     const abilityTrends = modules.map(m => {
       let trend = 'stable';
@@ -88,8 +111,8 @@ exports.main = async (event, context) => {
       data: {
         weekRange: getWeekRange(),
         weeklyTarget: dailyLimit * 7,
-        completedCount: user.totalQuestions || 0, // 这里应为本周累计，暂时取总数演示
-        accuracy: user.accuracy || 0,
+        completedCount: weeklyCompleted, 
+        accuracy: weeklyAccuracy,
         studyDays: user.streak || 0,
         avgTime: realAvgTime > 0 ? realAvgTime : 0,
         currentDay: getDayOfYearProgress(),
@@ -155,9 +178,9 @@ function generateWeeklyPlan(modules, dailyLimit) {
         desc = '侧重提升资料分析的运算精度与速度';
         break;
       case 4: // 周五
-        focus = [{label: '常识归纳', type: 'base'}, {label: '时政热点', type: 'base'}];
+        focus = [{label: '常识归纳', type: 'base'}, {label: '政治理论', type: 'base'}];
         time = 50;
-        desc = '复盘本周错题，并归纳最新时政考点';
+        desc = '复盘本周错题，并归纳最新政治理论考点';
         break;
       case 5: // 周六
         focus = [{label: '全量错题', type: 'weak'}, {label: '薄弱点复查', type: 'weak'}];

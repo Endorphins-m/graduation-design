@@ -161,7 +161,7 @@ export default {
 				'reasoning': '判断推理',
 				'dataAnalysis': '资料分析',
 				'commonSense': '常识判断',
-				'politics': '时政热点'
+				'politics': '政治理论'
 			};
 			// 如果是多个模块逗号分隔，返回第一个
 			const firstType = type.split(',')[0];

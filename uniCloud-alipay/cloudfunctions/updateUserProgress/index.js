@@ -8,13 +8,18 @@ exports.main = async (event, context) => {
   if (!userId) return { code: -1, message: '用户ID缺失' };
 
   try {
+    // 强制清理 totalCount 为 0 的异常 stats，防止 NaN 扩散
+    if (stats && stats.totalCount === 0 && stats.totalCorrect > 0) {
+       stats.totalCount = stats.totalCorrect;
+    }
+
     // 1. 动态构建更新对象
     const now = new Date();
     const todayStr = now.getFullYear() + '-' + (now.getMonth() + 1) + '-' + now.getDate();
     
     const updateData = {
-      totalQuestions: dbCmd.inc(stats.totalCount),
-      totalCorrect: dbCmd.inc(stats.totalCorrect || 0), // 记录累计正确数
+      totalQuestions: dbCmd.inc(Number(stats.totalCount) || 0),
+      totalCorrect: dbCmd.inc(Number(stats.totalCorrect) || 0), // 记录累计正确数
       lastPracticeTime: now.getTime(),
       lastPracticeDate: todayStr
     };
@@ -30,6 +35,8 @@ exports.main = async (event, context) => {
     // 只有当总题数大于 0 时才更新正确率
     if (currentTotal > 0) {
       updateData.accuracy = Math.round((currentCorrect / currentTotal) * 100);
+    } else {
+      updateData.accuracy = 0;
     }
 
     // 计算学习时长 (假设传入 stats.duration，单位为秒，转换为小时)
@@ -48,16 +55,81 @@ exports.main = async (event, context) => {
     }
 
     // 3. 更新具体模块的练习数 (moduleStats.verbal 等)
+    // 这里的 stats.modules 应该存储的是练习过程中某大类的累加数值
     if (stats.modules) {
       for (let key in stats.modules) {
-        updateData[`moduleStats.${key}`] = dbCmd.inc(stats.modules[key]);
+        let moduleKey = key;
+        const typeMapping = {
+          '言语理解': 'verbal',
+          '数量关系': 'quantitative',
+          '判断推理': 'reasoning',
+          '资料分析': 'dataAnalysis',
+          '常识判断': 'commonSense',
+          '政治理论': 'politics',
+          '时政聚焦': 'politics',
+          '时政热点': 'politics',
+          '政治理解': 'politics',
+          'politics': 'politics'
+        };
+        
+        // 统一映射到英文 key
+        const mappedKey = typeMapping[moduleKey] || moduleKey;
+        
+        // 使用累加而非覆盖处理：如果同一个请求报文中包含多个同类 key（如 '政治理论' 和 '时政聚焦'），需要将它们的数值累加后再用 dbCmd.inc
+        if (updateData[`moduleStats.${mappedKey}`] === undefined) {
+          updateData[`moduleStats.${mappedKey}`] = 0;
+          updateData[`moduleCorrect.${mappedKey}`] = 0;
+        }
+        
+        // 因为 updateData 是最终交给数据库的对象，不能直接在 updateData 中存原始数值再加 inc
+        // 我们在这里做一个中间变量来合并重复模块
+      }
+      
+      // 重新实现：合并同类项逻辑
+      const consolidatedStats = {};
+      const consolidatedCorrect = {};
+      
+      for (let key in stats.modules) {
+        const typeMapping = {
+          '言语理解': 'verbal', '数量关系': 'quantitative', '判断推理': 'reasoning', 
+          '资料分析': 'dataAnalysis', '常识判断': 'commonSense', '政治理论': 'politics',
+          '时政聚焦': 'politics', '时政热点': 'politics', '政治理解': 'politics', 'politics': 'politics'
+        };
+        const mKey = typeMapping[key] || key;
+        consolidatedStats[mKey] = (consolidatedStats[mKey] || 0) + Number(stats.modules[key] || 0);
+        
+        // 核心修正：即便正确率为0，也显式赋 0 值，确保进入 consolidatedCorrect 映射
+        const correctCount = (stats.modulesCorrect && stats.modulesCorrect[key] !== undefined) 
+          ? Number(stats.modulesCorrect[key]) 
+          : 0;
+        consolidatedCorrect[mKey] = (consolidatedCorrect[mKey] || 0) + correctCount;
+      }
+      
+      // 写入最终更新指令
+      for (let mKey in consolidatedStats) {
+        updateData[`moduleStats.${mKey}`] = dbCmd.inc(consolidatedStats[mKey]);
+        // 关键修正：显式确保正确数累加，即便是 0 原子增加
+        updateData[`moduleCorrect.${mKey}`] = dbCmd.inc(Number(consolidatedCorrect[mKey]) || 0);
+
+        // 新增：记录分模块练习时长
+        if (stats.duration) {
+          // 按照该模块在本次练习中的题目占比，粗略分配总时长
+          const ratio = consolidatedStats[mKey] / (stats.totalCount || 1);
+          const moduleDuration = Math.round(stats.duration * ratio);
+          updateData[`moduleDuration.${mKey}`] = dbCmd.inc(moduleDuration);
+        }
       }
     }
 
     // --- 新增：粒度化知识点/技能追踪 ---
     if (event.results && event.results.length > 0) {
       for (const res of event.results) {
-        let { knowledgePoint, skill, isCorrect } = res;
+        let { knowledgePoint, skill, isCorrect, moduleType } = res;
+        
+        // 如果 moduleType 是 'politics' 相关，确保知识点名称包含政治关键词以便 getUserStudyStats 匹配
+        if ((moduleType === 'politics' || moduleType === '时政聚焦' || moduleType === '政治理论' || moduleType === '时政热点') && (!knowledgePoint || knowledgePoint === '未分类')) {
+          knowledgePoint = '时政聚焦';
+        }
         
         // 更新知识点正确率：使用 profile 字段存储
         if (knowledgePoint) {

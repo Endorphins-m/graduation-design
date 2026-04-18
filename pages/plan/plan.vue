@@ -190,10 +190,6 @@
         <u-icon name="file-text" size="28" color="#2E5BFF"></u-icon>
         <text>查看完整计划</text>
       </view>
-      <view class="btn-outline" @tap="adjustPreference" style="flex: 1; height: 80rpx; line-height: 80rpx; background: #ffffff; border: 2rpx solid #2E5BFF; color: #2E5BFF; border-radius: 40rpx; font-size: 28rpx; display: flex; align-items: center; justify-content: center; gap: 12rpx;">
-        <u-icon name="setting" size="28" color="#2E5BFF"></u-icon>
-        <text>调整偏好</text>
-      </view>
     </view>
 
     <!-- 完整计划弹窗 -->
@@ -570,7 +566,7 @@ export default {
     },
     
     adjustPreference() {
-      uni.navigateTo({ url: '/pages/plan/preference' })
+      uni.navigateTo({ url: '/pages/plan/preference-settings' })
     },
     
     showTrendRules() {

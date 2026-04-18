@@ -39,6 +39,13 @@
         "navigationBarBackgroundColor": "#ffffff"
       }
     },
+    {
+      "path": "pages/plan/preference-settings",
+      "style": {
+        "navigationBarTitleText": "学习偏好",
+        "navigationBarBackgroundColor": "#F8FAFC"
+      }
+    },
 	{
 	  "path": "pages/library/library",
 	  "style": {

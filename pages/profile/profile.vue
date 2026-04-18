@@ -116,7 +116,7 @@
                 <view 
                   class="progress-fill" 
                   :class="getStatusClass(item.score)"
-                  :style="{ width: item.score + '%' }"
+                  :style="{ width: item.correctRate + '%' }"
                 ></view>
               </view>
               
@@ -124,8 +124,11 @@
               <view class="key-metrics">
                 <text class="metric">正确率 {{ item.correctRate }}%</text>
                 <text class="metric">平均 {{ item.avgTime }}秒/题</text>
+                <text class="metric" v-if="item.practiceCount > 0" style="color: #909399; font-size: 20rpx; margin-left: 10rpx;">
+                  ({{ getModuleCorrectCount(item.typeKey) }}/{{ item.practiceCount }})
+                </text>
                 <text class="metric trend" :class="item.trend">
-                  {{ item.trend === 'up' ? '↑' : item.trend === 'down' ? '↓' : '→' }} {{ item.change }}%
+                  {{ item.trend === 'up' ? '↑ ' + item.change + '%' : (item.trend === 'down' ? '' : '→') }}
                 </text>
               </view>
             </view>
@@ -137,41 +140,43 @@
             ></u-icon>
           </view>
           
-          <!-- 展开详情 -->
-          <view v-if="expandedIndex === index" class="ability-detail">
+          <view v-if="expandedIndex === index" class="ability-detail" style="display: block;">
             <!-- 详细指标 -->
             <view class="detail-metrics">
               <view class="detail-metric">
                 <text class="label">练习次数</text>
-                <text class="value">{{ item.practiceCount }}次</text>
+                <text class="value">{{ item.practiceCount || 0 }}次</text>
               </view>
               <view class="detail-metric">
                 <text class="label">累计用时</text>
-                <text class="value">{{ item.totalTime }}分钟</text>
+                <text class="value">{{ item.totalTime || 0 }}分钟</text>
               </view>
               <view class="detail-metric">
                 <text class="label">最近练习</text>
-                <text class="value">{{ item.lastPractice }}</text>
+                <text class="value">{{ item.lastPractice || '-' }}</text>
               </view>
             </view>
             
             <!-- 能力分析 -->
             <view class="ability-analysis">
-              <text class="analysis-title">精细化薄弱项分析</text>
+              <text class="analysis-title">精细化知识点分析</text>
               <view class="sub-knowledge-list">
                 <view 
-                  v-for="(kpValue, kpName) in getKnowledgePointsByModule(item.typeKey)" 
-                  :key="kpName"
+                  v-for="(kpItem, kIdx) in getKnowledgePointsByModule(item.typeKey)" 
+                  :key="kIdx"
                   class="sub-kp-item"
                 >
                   <view class="kp-info">
-                    <text class="kp-name">{{ kpName }}</text>
-                    <text class="kp-val" :class="kpValue < 60 ? 'weak' : 'good'">{{ kpValue }}%</text>
+                    <text class="kp-name">{{ kpItem.name }}</text>
+                    <text class="kp-val" :class="kpItem.accuracy < 60 ? 'weak' : 'good'">
+                      {{ kpItem.accuracy }}% 
+                      <text class="kp-count" v-if="kpItem.total > 0">({{ kpItem.correct }}/{{ kpItem.total }})</text>
+                    </text>
                   </view>
-                  <u-line-progress :percent="kpValue" :active-color="kpValue < 60 ? '#FF4D4F' : '#2E5BFF'" height="12"></u-line-progress>
+                  <u-line-progress :percent="kpItem.accuracy" :active-color="kpItem.accuracy < 60 ? '#FF4D4F' : '#2E5BFF'" height="12"></u-line-progress>
                 </view>
-                <view v-if="!hasKnowledgePoints(item.typeKey)" class="empty-kp">
-                  <text>暂无该模块细分知识点数据，快去刷题吧！</text>
+                <view v-if="getKnowledgePointsByModule(item.typeKey).length === 0" class="empty-kp">
+                  <text>暂无相关细分考点数据</text>
                 </view>
               </view>
               <text class="analysis-text" style="margin-top: 10px;">建议：{{ item.analysis }}</text>
@@ -271,9 +276,9 @@
             v-for="(point, index) in trendData" 
             :key="index"
             class="chart-bar"
-            :style="{ height: point.score + '%' }"
+            :style="{ height: Math.min(100, point.score) + '%' }"
           >
-            <view class="bar-tooltip">{{ point.score }}分</view>
+            <view class="bar-tooltip">{{ Math.min(100, point.score) }}分</view>
           </view>
         </view>
         <view class="chart-x-axis">
@@ -482,7 +487,7 @@ export default {
           typeKey: 'commonSense'
         },
         {
-          name: '时政聚焦',
+          name: '政治理论',
           icon: '🔔',
           score: 0,
           correctRate: 0,
@@ -641,59 +646,72 @@ export default {
       /**
        * 综合评分算法 V2.0
        * @param {string} key 模块键名
-       * @param {number} done 做题总数
+       * @param {number} rate 模块正确率
+       * @param {number} duration 模块总时长
        * @returns {Object} 包含各项指标的对象
        */
-      const calculateAdvancedScore = (key, done) => {
-        if (!done || done === 0) return { score: 40, correctRate: 0, avgTime: 0 };
+      const calculateAdvancedScore = (key, rate, duration = 0) => {
+        // 1. 获取后端传输的模块正确率 (0-100)
+        const correctRate = Math.max(0, Math.min(100, Number(rate) || 0)); 
         
-        // 1. 获取该模块错题数计算正确率
-        const wrong = wrongCountMap[key] || 0;
-        const correctRate = Math.round(((done - wrong) / done) * 100);
+        // 2. 获取真实的做题总数与正确数 (从细分知识点中累加，确保账实相符)
+        const kps = this.getKnowledgePointsByModule(key);
+        const actualDoneCount = kps.reduce((sum, item) => sum + (item.total || 0), 0);
+        const actualCorrectCount = kps.reduce((sum, item) => sum + (item.correct || 0), 0);
         
-        // 2. 模拟平均时间 (根据模块特性设定基准)
-        const baseTimeMap = { verbal: 45, quantitative: 90, reasoning: 50, dataAnalysis: 120, commonSense: 30, politics: 30 };
-        const avgTime = Math.max(15, baseTimeMap[key] - Math.floor(done / 10)); 
+        // --- 逻辑补偿：如果细分知识点累计正确率与模块总正确率有出入，优先信任细分汇总 ---
+        const finalCorrectRate = actualDoneCount > 0 
+          ? Math.round((actualCorrectCount / actualDoneCount) * 100) 
+          : correctRate;
         
-        // --- 核心算法逻辑改进 V2.1 ---
-        // 为了防止少量练习导致评分虚高，引入“数据置信度(Practice Confidence)”概念
-        // 只有当练习量达到一定门槛（如 50 题）时，评分才会更接近真实表现
-        // 基础分(30) + (活跃置信度 * 20) + (正确率贡献 * 50)
+        // 3. 计算真实平均时间 (根据后端记录的总时长计算)
+        let avgTime = 0;
+        let totalTimeMinutes = 0;
         
-        const confidenceScale = Math.min(done / 50, 1.0); // 练习 50 题视为完全可信
-        const activityContribution = Math.min((done / 10) * 4, 20); // 活跃度最高贡献 20 分
-        const accuracyContribution = (correctRate / 100) * 50; // 正确率最高贡献 50 分
+        if (duration > 0 && actualDoneCount > 0) {
+          avgTime = Math.round(duration / actualDoneCount);
+          totalTimeMinutes = Math.round(duration / 60);
+        } else {
+          // 兜底逻辑：若无真实时长记录，使用根据模块特性设定的基准模拟
+          const baseTimeMap = { verbal: 45, quantitative: 90, reasoning: 50, dataAnalysis: 120, commonSense: 30, politics: 30 };
+          avgTime = Math.max(15, baseTimeMap[key] - Math.floor(actualDoneCount / 10)); 
+          totalTimeMinutes = Math.round(actualDoneCount * avgTime / 60);
+        }
         
-        // 最终得分 = 基础分 + 加速增长后的贡献 * 置信度
-        // 这样做的结果：刚开始做几题即使全对，评分也只会从 30 缓慢爬升到 50-60，不会直接满分
+        // --- 能力画像分计算 (基础画像分≠正确率) ---
+        const confidenceScale = Math.min(actualDoneCount / 50, 1.0); 
+        const activityContribution = Math.min((actualDoneCount / 10) * 4, 20); 
+        const accuracyContribution = (finalCorrectRate / 100) * 50; 
+        
         const finalScore = Math.min(Math.round(30 + (activityContribution + accuracyContribution) * confidenceScale), 100);
         
         return {
           score: finalScore,
-          correctRate: correctRate,
+          correctRate: finalCorrectRate,
           avgTime: avgTime,
-          practiceCount: done,
-          totalTime: Math.round(done * avgTime / 60) 
+          practiceCount: actualDoneCount,
+          totalTime: totalTimeMinutes
         };
       };
 
+      const durationMap = data.moduleDuration || {};
       const moduleDetails = {
-        verbal: calculateAdvancedScore('verbal', stats.verbal || 0),
-        quantitative: calculateAdvancedScore('quantitative', stats.quantitative || 0),
-        reasoning: calculateAdvancedScore('reasoning', stats.reasoning || 0),
-        dataAnalysis: calculateAdvancedScore('dataAnalysis', stats.dataAnalysis || 0),
-        commonSense: calculateAdvancedScore('commonSense', stats.commonSense || 0),
-        politics: calculateAdvancedScore('politics', stats.politics || 0)
+        verbal: calculateAdvancedScore('verbal', stats.verbal || 0, durationMap.verbal),
+        quantitative: calculateAdvancedScore('quantitative', stats.quantitative || 0, durationMap.quantitative),
+        reasoning: calculateAdvancedScore('reasoning', stats.reasoning || 0, durationMap.reasoning),
+        dataAnalysis: calculateAdvancedScore('dataAnalysis', stats.dataAnalysis || 0, durationMap.dataAnalysis),
+        commonSense: calculateAdvancedScore('commonSense', stats.commonSense || 0, durationMap.commonSense),
+        politics: calculateAdvancedScore('politics', stats.politics || 0, durationMap.politics)
       };
 
-      // 更新雷达图数据源
+      // 更新雷达图数据源 (增加容错)
       this.abilityData = {
-        verbal: moduleDetails.verbal.score,
-        quantitative: moduleDetails.quantitative.score,
-        reasoning: moduleDetails.reasoning.score,
-        dataAnalysis: moduleDetails.dataAnalysis.score,
-        commonSense: moduleDetails.commonSense.score,
-        politics: moduleDetails.politics.score
+        verbal: Math.max(0, moduleDetails.verbal?.score || 0),
+        quantitative: Math.max(0, moduleDetails.quantitative?.score || 0),
+        reasoning: Math.max(0, moduleDetails.reasoning?.score || 0),
+        dataAnalysis: Math.max(0, moduleDetails.dataAnalysis?.score || 0),
+        commonSense: Math.max(0, moduleDetails.commonSense?.score || 0),
+        politics: Math.max(0, moduleDetails.politics?.score || 0)
       };
       
       // 更新下方详细能力列表
@@ -709,7 +727,7 @@ export default {
           // 动态生成分析文案
           if (item.score < 60) {
             item.trend = 'down';
-            item.change = Math.floor(Math.random() * 5) + 1;
+            item.change = 0; // 下降时不显示具体百分比
             item.analysis = `当前练习量不足或错误率较高，建议针对基础考点进行专项突破。`;
           } else if (item.score < 85) {
             item.trend = 'up';
@@ -731,28 +749,63 @@ export default {
     
     // 新增：精细化知识点获取助手
     getKnowledgePointsByModule(moduleKey) {
-      const result = {};
-      const possibleKPs = this.knowledgePointMapping[moduleKey] || [];
+      if (!this.knowledgePointsData) return [];
       
-      // 1. 先匹配映射表中的标准知识点
-      possibleKPs.forEach(kp => {
-        if (this.knowledgePointsData[kp] !== undefined) {
-          result[kp] = this.knowledgePointsData[kp];
-        } else if (this.knowledgePointsData[kp.replace(/\./g, '_')] !== undefined) {
-          // 兼容含点的 key
-          result[kp] = this.knowledgePointsData[kp.replace(/\./g, '_')];
+      const result = [];
+      const kps = this.knowledgePointsData;
+      
+      // 模块与知识点的包含关系映射 (增强匹配) - 使用正则表达式更精确
+      const moduleKpMap = {
+        verbal: ["主旨", "细节", "词句", "排序", "填空", "辨析", "文章", "言语"],
+        quantitative: ["代数", "几何", "行程", "排列", "概率", "工程", "利润", "容斥", "数量"],
+        reasoning: ["图推", "类比", "定义", "逻辑", "关联词", "真假话", "判断"],
+        dataAnalysis: ["增长率", "增长量", "比重", "倍数", "平均", "分析", "计算", "资料"],
+        commonSense: ["法律", "人文", "历史", "科技", "政治", "地理", "经济", "常识"],
+        politics: ["精神", "会议", "文件", "时政", "讲话", "党史"]
+      };
+      
+      const keywords = moduleKpMap[moduleKey] || [];
+      
+      // 遍历所有知识点数据进行匹配
+      Object.keys(kps).forEach(key => {
+        const kp = kps[key];
+        // 兼容不同的数据结构：可能是 {total, correct, accuracy} 也可能是 直接的百分比(旧版)
+        let total = 0, correct = 0, accuracy = 0;
+        
+        if (kp && typeof kp === 'object') {
+          total = kp.total || 0;
+          correct = kp.correct || 0;
+          accuracy = kp.accuracy || (total > 0 ? Math.round((correct / total) * 100) : 0);
+        } else if (typeof kp === 'number') {
+          accuracy = kp;
+          total = 1; // 假定一个总数用于占位
+        }
+
+        // 匹配逻辑：知识点名称包含模块关键字
+        const isMatch = keywords.some(k => key.includes(k));
+        
+        if (isMatch && (total > 0 || accuracy > 0)) {
+          result.push({
+            name: key.replace(/_/g, '.'),
+            total: total,
+            correct: correct,
+            accuracy: accuracy
+          });
         }
       });
       
-      // 2. 兜底逻辑：遍历所有数据，找到那些名称包含关键字但没在映射表中的
-      // 比如数据库里叫 "高频词汇"，映射表里叫 "成语辨析"
-      // 为了不显示过杂，这里仅在 result 还是空的时候做简单的模糊匹配或显示“其他”
-      return result;
+      // 按正确率升序排列，将薄弱项排在前面
+      return result.sort((a, b) => a.accuracy - b.accuracy);
     },
     
     hasKnowledgePoints(moduleKey) {
+      return this.getKnowledgePointsByModule(moduleKey).length > 0;
+    },
+    
+    // 新增：获取模块正确题数
+    getModuleCorrectCount(moduleKey) {
       const kps = this.getKnowledgePointsByModule(moduleKey);
-      return Object.keys(kps).length > 0;
+      return kps.reduce((sum, item) => sum + (item.correct || 0), 0);
     },
     
     // 获取状态样式
@@ -797,7 +850,7 @@ export default {
         'reasoning': '判断推理',
         'dataAnalysis': '资料分析',
         'commonSense': '常识判断',
-        'politics': '时政聚焦'
+        'politics': '政治理论'
       }
       
       const abilityName = abilityMap[type]

@@ -465,10 +465,11 @@ export default {
           totalCount: this.questionQueue.length,
           totalCorrect: 0,
           duration: this.totalTime, // 本次练习时长（秒）
-          modules: {}
+          modules: {},
+          modulesCorrect: {} // 新增：记录各模块正确数
         };
         
-        // --- 收集错题和知识点信息 ---
+        // --- 收集错题 and 知识点信息 ---
         const wrongQuestions = [];
         const results = []; // 包含每题的正确性、知识点和技能
 
@@ -483,8 +484,11 @@ export default {
             '判断推理': 'reasoning',
             '资料分析': 'dataAnalysis',
             '常识判断': 'commonSense',
+            '政治理论': 'politics',
             '时政聚焦': 'politics',
-            '时政热点': 'politics'
+            '时政热点': 'politics',
+            '政治理解': 'politics',
+            'politics': 'politics'
           };
           
           if (typeMapping[moduleKey]) {
@@ -501,18 +505,22 @@ export default {
             id: q._id,
             knowledgePoint: q.knowledgePoint || q.category || '未分类',
             skill: q.skill || (q.knowledgePoint ? '综合分析' : '基础知识'),
-            isCorrect: isCorrect
+            isCorrect: isCorrect,
+            moduleType: moduleKey
           });
 
           // 记录正确数
           if (isCorrect) {
             stats.totalCorrect++;
-          } else if (q.userAnswer !== null) {
-            // 记录错题
+            if (!stats.modulesCorrect[moduleKey]) stats.modulesCorrect[moduleKey] = 0;
+            stats.modulesCorrect[moduleKey]++;
+          } else {
+            // 只要做了（不管是选错还是未选），都进入错题集或记录
+            // 如果 userAnswer 为 null，说明是跳过的，也算错
             wrongQuestions.push({
               id: q._id,
               moduleType: moduleKey,
-              userAnswer: q.userAnswer
+              userAnswer: q.userAnswer === null ? -1 : q.userAnswer // -1 表示未作答
             });
           }
         });

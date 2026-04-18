@@ -49,6 +49,7 @@ exports.main = async (event, context) => {
 			'判断推理': 'reasoning_questions',
 			'资料分析': 'data_analysis_questions',
 			'常识判断': 'common_sense_questions',
+			'政治理论': 'politics_questions',
 			'时政热点': 'politics_questions',
 			'政治理解': 'politics_questions',
 			'时事政治': 'politics_questions',

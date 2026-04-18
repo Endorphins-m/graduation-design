@@ -91,7 +91,7 @@ export default {
       
       const sides = 6;
       const angle = (Math.PI * 2) / sides;
-      const labels = ["言语理解", "数量关系", "判断推理", "资料分析", "常识判断", "时政聚焦"];
+      const labels = ["言语理解", "数量关系", "判断推理", "资料分析", "常识判断", "政治理论"];
       const scores = [
         Math.round(this.data.verbal || 50),
         Math.round(this.data.quantitative || 50),
